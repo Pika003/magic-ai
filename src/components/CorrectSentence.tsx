@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle, Wand2, Copy, RefreshCw } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { correctSentenceWithAI } from '@/services/openaiService';
 
 export const CorrectSentence = () => {
   const [inputText, setInputText] = useState('');
@@ -25,31 +26,37 @@ export const CorrectSentence = () => {
 
     setIsLoading(true);
     
-    // Simulate AI processing
-    setTimeout(() => {
-      // Mock correction logic - replace with actual AI API call
-      const mockCorrections = [
-        "Grammar improved",
-        "Punctuation fixed", 
-        "Word choice enhanced"
-      ];
-      
-      const mockCorrectedText = inputText
-        .replace(/\bi\b/g, 'I')
-        .replace(/\bim\b/g, "I'm")
-        .replace(/\bdont\b/g, "don't")
-        .replace(/\bcant\b/g, "can't")
-        .replace(/\bwont\b/g, "won't");
-      
-      setCorrectedText(mockCorrectedText || inputText);
-      setCorrections(mockCorrections);
-      setIsLoading(false);
+    try {
+      const result = await correctSentenceWithAI(inputText);
+      setCorrectedText(result.correctedText);
+      setCorrections(result.improvements);
       
       toast({
         title: "Success!",
-        description: "Your sentence has been corrected.",
+        description: "Your sentence has been corrected using AI.",
       });
-    }, 2000);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to correct sentence. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    if (!inputText.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a sentence to get different results.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    await handleCorrection();
   };
 
   const copyToClipboard = (text: string) => {
@@ -83,7 +90,7 @@ export const CorrectSentence = () => {
           </CardHeader>
           <CardContent>
             <Textarea
-              placeholder="Type your sentence here..."
+              placeholder="Type your sentence here... (e.g., 'we com pleted the data base setup and fix ed the log in issue')"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               className="min-h-32 resize-none border-slate-200 focus:border-blue-500"
@@ -102,9 +109,17 @@ export const CorrectSentence = () => {
                 ) : (
                   <>
                     <CheckCircle className="w-4 h-4 mr-2" />
-                    Correct Sentence
+                    Correct with AI
                   </>
                 )}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={handleRefresh}
+                disabled={isLoading || !inputText.trim()}
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Refresh
               </Button>
               <Button variant="outline" onClick={clearAll}>
                 Clear
@@ -117,7 +132,7 @@ export const CorrectSentence = () => {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <CheckCircle className="w-5 h-5 text-green-500" />
-              <span>Corrected Sentence</span>
+              <span>AI Corrected Sentence</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -125,13 +140,13 @@ export const CorrectSentence = () => {
               {correctedText ? (
                 <p className="text-slate-800 leading-relaxed">{correctedText}</p>
               ) : (
-                <p className="text-slate-400 italic">Corrected sentence will appear here...</p>
+                <p className="text-slate-400 italic">AI corrected sentence will appear here...</p>
               )}
             </div>
             
             {corrections.length > 0 && (
               <div className="mt-4">
-                <h4 className="text-sm font-semibold text-slate-700 mb-2">Corrections Applied:</h4>
+                <h4 className="text-sm font-semibold text-slate-700 mb-2">AI Improvements Applied:</h4>
                 <div className="flex flex-wrap gap-2">
                   {corrections.map((correction, index) => (
                     <Badge key={index} variant="secondary" className="bg-blue-100 text-blue-800">

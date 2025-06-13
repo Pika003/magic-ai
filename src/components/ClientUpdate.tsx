@@ -5,10 +5,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, Send, MessageSquare, User, Mail, Link, MessageCircle } from 'lucide-react';
+import { Users, Send, MessageSquare, RefreshCw, Copy, ExternalLink } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { generateClientUpdateWithAI } from '@/services/openaiService';
 
-interface ClientMessage {
+interface ClientUpdate {
   id: string;
   clientName: string;
   originalMessage: string;
@@ -24,96 +25,13 @@ export const ClientUpdate = () => {
   const [liveLink, setLiveLink] = useState('');
   const [formattedUpdate, setFormattedUpdate] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [clientMessages, setClientMessages] = useState<ClientMessage[]>([
-    {
-      id: '1',
-      clientName: 'John Smith',
-      originalMessage: 'We completed the database setup. We fixed the login issue. We added new features.',
-      formattedUpdate: `Hi @John Smith,
-
-Today's Update:
-----------------
-1. We completed the database setup.
-2. We fixed the login issue.
-3. We added new features.
-
-You can check the progress here: https://example.com
-
-Thanks`,
-      liveLink: 'https://example.com',
-      sentAt: '2024-01-15 2:30 PM',
-      status: 'sent'
-    }
-  ]);
-
-  const correctSentence = (text: string) => {
-    // First, correct common spacing and spelling issues
-    let correctedText = text
-      .replace(/\s+/g, ' ') // Multiple spaces to single space
-      .trim()
-      // Fix common split words
-      .replace(/\bsen tence\b/gi, 'sentence')
-      .replace(/\bdata base\b/gi, 'database')
-      .replace(/\blog in\b/gi, 'login')
-      .replace(/\bsign up\b/gi, 'signup')
-      .replace(/\bset up\b/gi, 'setup')
-      .replace(/\bback end\b/gi, 'backend')
-      .replace(/\bfront end\b/gi, 'frontend')
-      .replace(/\bwork flow\b/gi, 'workflow')
-      .replace(/\buser name\b/gi, 'username')
-      .replace(/\bpass word\b/gi, 'password')
-      .replace(/\bany thing\b/gi, 'anything')
-      .replace(/\bsome thing\b/gi, 'something')
-      .replace(/\bevery thing\b/gi, 'everything')
-      .replace(/\bany one\b/gi, 'anyone')
-      .replace(/\bsome one\b/gi, 'someone')
-      .replace(/\bevery one\b/gi, 'everyone')
-      .replace(/\bmay be\b/gi, 'maybe')
-      .replace(/\bcan not\b/gi, 'cannot')
-      .replace(/\bup date\b/gi, 'update')
-      .replace(/\bcom pleted\b/gi, 'completed')
-      .replace(/\bfix ed\b/gi, 'fixed')
-      .replace(/\badd ed\b/gi, 'added')
-      .replace(/\bfeat ures\b/gi, 'features')
-      .replace(/\bimple mented\b/gi, 'implemented')
-      .replace(/\boptim ized\b/gi, 'optimized')
-      .replace(/\breso lved\b/gi, 'resolved')
-      .replace(/\bdeploy ed\b/gi, 'deployed')
-      // Fix basic grammar
-      .replace(/\bi\b/g, 'I')
-      .replace(/\bim\b/gi, "I'm")
-      .replace(/\bdont\b/gi, "don't")
-      .replace(/\bcant\b/gi, "can't")
-      .replace(/\bwont\b/gi, "won't")
-      .replace(/\bisnt\b/gi, "isn't")
-      .replace(/\bwasnt\b/gi, "wasn't")
-      .replace(/\bwerent\b/gi, "weren't")
-      .replace(/\bdidnt\b/gi, "didn't")
-      .replace(/\bhavent\b/gi, "haven't")
-      .replace(/\bhasnt\b/gi, "hasn't")
-      .replace(/\bshouldnt\b/gi, "shouldn't")
-      .replace(/\bwouldnt\b/gi, "wouldn't")
-      .replace(/\bcouldnt\b/gi, "couldn't")
-      // Improve common phrases
-      .replace(/\bmade\s+(the\s+)?website\b/gi, 'developed the website')
-      .replace(/\bdid\s+(the\s+)?coding\b/gi, 'completed the development')
-      .replace(/\bfixed\s+(the\s+)?bugs?\b/gi, 'resolved the issues')
-      .replace(/\bmade\s+(it\s+)?better\b/gi, 'improved the functionality')
-      .replace(/\bput\s+new\s+things?\b/gi, 'added new features')
-      .replace(/\bmade\s+(it\s+)?faster\b/gi, 'optimized the performance')
-      .replace(/\bworking\s+on\b/gi, 'developing')
-      .replace(/\bmaking\s+sure\b/gi, 'ensuring')
-      .replace(/\btesting\s+(the\s+)?stuff\b/gi, 'conducting quality assurance')
-      .replace(/\bfixing\s+(the\s+)?problems?\b/gi, 'resolving issues');
-
-    return correctedText;
-  };
+  const [clientUpdates, setClientUpdates] = useState<ClientUpdate[]>([]);
 
   const processMessage = async () => {
-    if (!clientName.trim() || !originalMessage.trim()) {
+    if (!originalMessage.trim() || !clientName.trim()) {
       toast({
         title: "Error",
-        description: "Please enter both client name and message.",
+        description: "Please enter client name and update message.",
         variant: "destructive"
       });
       return;
@@ -121,94 +39,79 @@ Thanks`,
 
     setIsProcessing(true);
     
-    // Simulate AI processing
-    setTimeout(() => {
-      // Correct and improve the entire message first
-      const correctedMessage = correctSentence(originalMessage);
-      
-      // Split the corrected message into sentences and format as numbered list
-      const sentences = correctedMessage
-        .split(/[.!?]+/)
-        .map(s => s.trim())
-        .filter(s => s.length > 0)
-        .map(s => {
-          // Capitalize first letter and ensure proper sentence structure
-          let sentence = s.charAt(0).toUpperCase() + s.slice(1);
-          
-          // Ensure professional language
-          sentence = sentence
-            .replace(/\bwe\s+/gi, 'We ')
-            .replace(/\bi\s+/gi, 'We ');
-          
-          return sentence + '.';
-        });
-
-      const numberedList = sentences
-        .map((sentence, index) => `${index + 1}. ${sentence}`)
-        .join('\n');
-
-      let formatted = `Hi @${clientName},
-
-Today's Update:
-----------------
-${numberedList}`;
-
-      // Add live link if provided
-      if (liveLink.trim()) {
-        formatted += `\n\nYou can check the progress here: ${liveLink}`;
-      }
-
-      formatted += '\n\nThanks';
-      
+    try {
+      const formatted = await generateClientUpdateWithAI(originalMessage, clientName, liveLink);
       setFormattedUpdate(formatted);
-      setIsProcessing(false);
       
       toast({
-        title: "Update Formatted!",
-        description: "Your client update has been formatted professionally with improved sentences.",
+        title: "Client Update Generated!",
+        description: "Your client update has been corrected and formatted using AI.",
       });
-    }, 1500);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to generate client update. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    if (!originalMessage.trim() || !clientName.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter client name and message to get different results.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    await processMessage();
   };
 
   const shareToWhatsApp = () => {
-    const message = encodeURIComponent(formattedUpdate);
-    window.open(`https://wa.me/?text=${message}`, '_blank');
+    const url = `https://wa.me/?text=${encodeURIComponent(formattedUpdate)}`;
+    window.open(url, '_blank');
     toast({
-      title: "WhatsApp Opened",
-      description: "Share your update via WhatsApp.",
+      title: "Shared to WhatsApp!",
+      description: "Update shared to WhatsApp.",
     });
   };
 
   const shareToSlack = () => {
-    const message = encodeURIComponent(formattedUpdate);
-    window.open(`https://slack.com/intl/en-in/help/articles/201330736-Add-apps-to-your-Slack-workspace#share-content-in-slack`, '_blank');
+    const url = `https://slack.com/intl/en-in/help/articles/201330736-Add-apps-to-your-Slack-workspace`;
+    window.open(url, '_blank');
     navigator.clipboard.writeText(formattedUpdate);
     toast({
-      title: "Copied for Slack",
-      description: "Message copied to clipboard. Paste it in Slack.",
+      title: "Copied for Slack!",
+      description: "Update copied to clipboard for Slack sharing.",
     });
   };
 
   const shareToTeams = () => {
     navigator.clipboard.writeText(formattedUpdate);
-    window.open('https://teams.microsoft.com/', '_blank');
+    const url = 'https://teams.microsoft.com/';
+    window.open(url, '_blank');
     toast({
-      title: "Copied for Teams",
-      description: "Message copied to clipboard. Paste it in Microsoft Teams.",
+      title: "Copied for Teams!",
+      description: "Update copied to clipboard for Teams sharing.",
     });
   };
 
   const shareToUpwork = () => {
     navigator.clipboard.writeText(formattedUpdate);
-    window.open('https://www.upwork.com/nx/wm/workroom', '_blank');
+    const url = 'https://www.upwork.com/nx/find-work/best-matches';
+    window.open(url, '_blank');
     toast({
-      title: "Copied for Upwork",
-      description: "Message copied to clipboard. Paste it in Upwork messages.",
+      title: "Copied for Upwork!",
+      description: "Update copied to clipboard for Upwork sharing.",
     });
   };
 
-  const sendMessage = () => {
-    const newMessage: ClientMessage = {
+  const sendUpdate = () => {
+    const newUpdate: ClientUpdate = {
       id: Date.now().toString(),
       clientName,
       originalMessage,
@@ -218,38 +121,23 @@ ${numberedList}`;
       status: 'sent'
     };
 
-    setClientMessages([newMessage, ...clientMessages]);
+    setClientUpdates([newUpdate, ...clientUpdates]);
     setClientName('');
     setOriginalMessage('');
-    setFormattedUpdate('');
     setLiveLink('');
+    setFormattedUpdate('');
     
     toast({
-      title: "Update Sent!",
-      description: `Professional update sent to ${clientName}.`,
+      title: "Client Update Sent!",
+      description: "Your client update has been sent.",
     });
   };
 
-  const saveDraft = () => {
-    const newMessage: ClientMessage = {
-      id: Date.now().toString(),
-      clientName,
-      originalMessage,
-      formattedUpdate,
-      liveLink,
-      sentAt: new Date().toLocaleString(),
-      status: 'draft'
-    };
-
-    setClientMessages([newMessage, ...clientMessages]);
-    setClientName('');
-    setOriginalMessage('');
-    setFormattedUpdate('');
-    setLiveLink('');
-    
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
     toast({
-      title: "Draft Saved!",
-      description: "Update saved as draft for later sending.",
+      title: "Copied!",
+      description: "Update copied to clipboard.",
     });
   };
 
@@ -257,7 +145,7 @@ ${numberedList}`;
     <div className="p-8">
       <div className="text-center mb-8">
         <h2 className="text-3xl font-bold text-slate-800 mb-2">Client Update</h2>
-        <p className="text-slate-600">Format your sentences into professional client updates with improved grammar</p>
+        <p className="text-slate-600">Create professional client updates with automatic AI correction and formatting</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -265,7 +153,7 @@ ${numberedList}`;
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <MessageSquare className="w-5 h-5 text-blue-500" />
-              <span>Create Update</span>
+              <span>Client Information & Updates</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -274,7 +162,7 @@ ${numberedList}`;
                 Client Name
               </label>
               <Input
-                placeholder="Enter client name..."
+                placeholder="Enter client name"
                 value={clientName}
                 onChange={(e) => setClientName(e.target.value)}
                 className="border-slate-200 focus:border-blue-500"
@@ -283,51 +171,71 @@ ${numberedList}`;
             
             <div>
               <label className="text-sm font-medium text-slate-700 mb-2 block">
-                Your Updates (separate with periods)
-              </label>
-              <Textarea
-                placeholder="i completed task A. i fix ed issue B. i add ed feature C."
-                value={originalMessage}
-                onChange={(e) => setOriginalMessage(e.target.value)}
-                className="min-h-32 resize-none border-slate-200 focus:border-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-medium text-slate-700 mb-2 block">
                 Live Link (Optional)
               </label>
               <Input
-                placeholder="https://your-website.com"
+                placeholder="https://your-project-link.com"
                 value={liveLink}
                 onChange={(e) => setLiveLink(e.target.value)}
                 className="border-slate-200 focus:border-blue-500"
               />
             </div>
             
-            <Button 
-              onClick={processMessage}
-              disabled={isProcessing || !originalMessage.trim()}
-              className="w-full bg-blue-500 hover:bg-blue-600"
-            >
-              {isProcessing ? 'Formatting...' : 'Format Update'}
-            </Button>
+            <div>
+              <label className="text-sm font-medium text-slate-700 mb-2 block">
+                Update Message
+              </label>
+              <Textarea
+                placeholder="We com pleted the data base setup. We fix ed the log in issue. We add ed new feat ures for the client."
+                value={originalMessage}
+                onChange={(e) => setOriginalMessage(e.target.value)}
+                className="min-h-32 resize-none border-slate-200 focus:border-blue-500"
+              />
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Button 
+                onClick={processMessage}
+                disabled={isProcessing || !originalMessage.trim() || !clientName.trim()}
+                className="bg-blue-500 hover:bg-blue-600"
+              >
+                {isProcessing ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Users className="w-4 h-4 mr-2" />
+                    Generate with AI
+                  </>
+                )}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={handleRefresh}
+                disabled={isProcessing || !originalMessage.trim() || !clientName.trim()}
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Refresh
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
         <Card className="border-slate-200">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <Mail className="w-5 h-5 text-green-500" />
-              <span>Formatted Update</span>
+              <Users className="w-5 h-5 text-green-500" />
+              <span>AI Generated Client Update</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="min-h-32 p-4 bg-green-50 border border-green-200 rounded-lg mb-4 font-mono text-sm">
+            <div className="min-h-32 p-4 bg-green-50 border border-green-200 rounded-lg mb-4">
               {formattedUpdate ? (
-                <pre className="text-slate-800 whitespace-pre-wrap">{formattedUpdate}</pre>
+                <div className="text-slate-800 whitespace-pre-wrap">{formattedUpdate}</div>
               ) : (
-                <p className="text-slate-400 italic">Formatted update will appear here...</p>
+                <p className="text-slate-400 italic">AI generated client update will appear here...</p>
               )}
             </div>
             
@@ -335,59 +243,35 @@ ${numberedList}`;
               <div className="space-y-3">
                 <div className="flex space-x-2">
                   <Button 
-                    onClick={sendMessage}
+                    onClick={sendUpdate}
                     className="flex-1 bg-green-500 hover:bg-green-600"
                   >
                     <Send className="w-4 h-4 mr-2" />
                     Send Update
                   </Button>
-                  <Button 
+                  <Button
                     variant="outline"
-                    onClick={saveDraft}
-                    className="flex-1"
+                    size="sm"
+                    onClick={() => copyToClipboard(formattedUpdate)}
                   >
-                    Save Draft
+                    <Copy className="w-4 h-4" />
                   </Button>
                 </div>
                 
-                <div className="pt-2 border-t">
-                  <p className="text-sm font-medium text-slate-700 mb-2">Share via:</p>
+                <div className="border-t pt-3">
+                  <p className="text-sm font-medium text-slate-700 mb-2">Share to platforms:</p>
                   <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={shareToWhatsApp}
-                      className="flex items-center space-x-2"
-                    >
-                      <MessageCircle className="w-4 h-4 text-green-600" />
-                      <span>WhatsApp</span>
+                    <Button variant="outline" size="sm" onClick={shareToWhatsApp} className="text-green-600">
+                      WhatsApp
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={shareToSlack}
-                      className="flex items-center space-x-2"
-                    >
-                      <MessageSquare className="w-4 h-4 text-purple-600" />
-                      <span>Slack</span>
+                    <Button variant="outline" size="sm" onClick={shareToSlack} className="text-purple-600">
+                      Slack
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={shareToTeams}
-                      className="flex items-center space-x-2"
-                    >
-                      <Users className="w-4 h-4 text-blue-600" />
-                      <span>Teams</span>
+                    <Button variant="outline" size="sm" onClick={shareToTeams} className="text-blue-600">
+                      Teams
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={shareToUpwork}
-                      className="flex items-center space-x-2"
-                    >
-                      <User className="w-4 h-4 text-green-500" />
-                      <span>Upwork</span>
+                    <Button variant="outline" size="sm" onClick={shareToUpwork} className="text-green-700">
+                      Upwork
                     </Button>
                   </div>
                 </div>
@@ -402,53 +286,55 @@ ${numberedList}`;
           <CardTitle className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Users className="w-5 h-5 text-slate-600" />
-              <span>Update History</span>
+              <span>Client Update History</span>
             </div>
             <Badge variant="secondary">
-              {clientMessages.length} updates
+              {clientUpdates.length} updates
             </Badge>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {clientMessages.length === 0 ? (
+          {clientUpdates.length === 0 ? (
             <div className="text-center py-8">
               <MessageSquare className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-              <p className="text-slate-500">No updates yet</p>
+              <p className="text-slate-500">No client updates yet</p>
             </div>
           ) : (
             <div className="space-y-4">
-              {clientMessages.map((message) => (
+              {clientUpdates.map((update) => (
                 <div 
-                  key={message.id}
+                  key={update.id}
                   className="p-4 border border-slate-200 rounded-lg"
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-2">
-                      <User className="w-4 h-4 text-slate-500" />
-                      <span className="font-medium text-slate-800">{message.clientName}</span>
-                      {message.liveLink && (
-                        <Link className="w-4 h-4 text-blue-500" />
+                      <Users className="w-4 h-4 text-slate-500" />
+                      <span className="font-medium text-slate-800">Client: {update.clientName}</span>
+                      {update.liveLink && (
+                        <a 
+                          href={update.liveLink} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-500 hover:text-blue-700"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
                       )}
                     </div>
                     <div className="flex items-center space-x-2">
                       <Badge 
-                        variant={message.status === 'sent' ? 'default' : 'secondary'}
-                        className={message.status === 'sent' ? 'bg-green-500' : ''}
+                        variant={update.status === 'sent' ? 'default' : 'secondary'}
+                        className={update.status === 'sent' ? 'bg-green-500' : ''}
                       >
-                        {message.status === 'sent' ? 'Sent' : 'Draft'}
+                        {update.status === 'sent' ? 'Sent' : 'Draft'}
                       </Badge>
-                      <span className="text-sm text-slate-500">{message.sentAt}</span>
+                      <span className="text-sm text-slate-500">{update.sentAt}</span>
                     </div>
                   </div>
                   
-                  <div className="bg-slate-50 p-3 rounded border mb-3">
-                    <p className="text-sm font-medium text-slate-600 mb-1">Original:</p>
-                    <p className="text-slate-700">{message.originalMessage}</p>
-                  </div>
-                  
                   <div className="bg-green-50 p-3 rounded border border-green-200">
-                    <p className="text-sm font-medium text-green-700 mb-1">Formatted Update:</p>
-                    <pre className="text-green-800 text-sm whitespace-pre-wrap font-mono">{message.formattedUpdate}</pre>
+                    <p className="text-sm font-medium text-green-700 mb-1">Client Update:</p>
+                    <div className="text-green-800 text-sm whitespace-pre-wrap">{update.formattedUpdate}</div>
                   </div>
                 </div>
               ))}

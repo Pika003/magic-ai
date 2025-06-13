@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -6,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Send, MessageSquare, RefreshCw, Copy } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { formatDailyUpdateWithAI } from '@/services/openaiService';
 
 interface DailyUpdate {
   id: string;
@@ -45,93 +45,36 @@ export const TodaysUpdate = () => {
 
     setIsProcessing(true);
     
-    // Simulate AI processing with sentence correction and formatting
-    setTimeout(() => {
-      // First, correct common spacing and spelling issues
-      let correctedText = originalMessage
-        .replace(/\s+/g, ' ') // Multiple spaces to single space
-        .replace(/\b(\w+)\s+(\w+)\b/g, (match, word1, word2) => {
-          // Fix common split words
-          const commonWords = {
-            'sen tence': 'sentence',
-            'data base': 'database',
-            'log in': 'login',
-            'sign up': 'signup',
-            'set up': 'setup',
-            'back end': 'backend',
-            'front end': 'frontend',
-            'work flow': 'workflow',
-            'user name': 'username',
-            'pass word': 'password',
-            'any thing': 'anything',
-            'some thing': 'something',
-            'every thing': 'everything',
-            'any one': 'anyone',
-            'some one': 'someone',
-            'every one': 'everyone',
-            'may be': 'maybe',
-            'can not': 'cannot',
-            'a lot': 'a lot', // This one is correct as two words
-            'up date': 'update',
-            'com pleted': 'completed',
-            'fix ed': 'fixed',
-            'add ed': 'added',
-            'feat ures': 'features'
-          };
-          
-          const combined = `${word1} ${word2}`.toLowerCase();
-          return commonWords[combined] || match;
-        })
-        // Fix basic grammar and capitalization
-        .replace(/\bi\b/g, 'I')
-        .replace(/\bim\b/g, "I'm")
-        .replace(/\bdont\b/g, "don't")
-        .replace(/\bcant\b/g, "can't")
-        .replace(/\bwont\b/g, "won't")
-        .replace(/\bisnt\b/g, "isn't")
-        .replace(/\bwasnt\b/g, "wasn't")
-        .replace(/\bwerent\b/g, "weren't")
-        .replace(/\bdidnt\b/g, "didn't")
-        .replace(/\bhavent\b/g, "haven't")
-        .replace(/\bhasnt\b/g, "hasn't")
-        .replace(/\bshouldnt\b/g, "shouldn't")
-        .replace(/\bwouldnt\b/g, "wouldn't")
-        .replace(/\bcouldnt\b/g, "couldn't");
-
-      // Split into sentences and clean them up
-      const sentences = correctedText
-        .split(/[.!?]+/)
-        .map(s => s.trim())
-        .filter(s => s.length > 0)
-        .map(s => {
-          // Capitalize first letter and ensure proper sentence structure
-          let sentence = s.charAt(0).toUpperCase() + s.slice(1);
-          
-          // Ensure sentences end with period
-          if (!sentence.endsWith('.') && !sentence.endsWith('!') && !sentence.endsWith('?')) {
-            sentence += '.';
-          }
-          
-          return sentence;
-        });
-
-      // Format as numbered list
-      const numberedList = sentences
-        .map((sentence, index) => `${index + 1}. ${sentence}`)
-        .join('\n');
-
-      const formatted = `Today's Update:
-----------------
-${numberedList}`;
-      
+    try {
+      const formatted = await formatDailyUpdateWithAI(originalMessage);
       setFormattedUpdate(formatted);
-      setIsProcessing(false);
       
       toast({
         title: "Update Formatted!",
-        description: "Your daily update has been corrected and formatted.",
+        description: "Your daily update has been corrected and formatted using AI.",
       });
-    }, 1500);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to format update. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    if (!originalMessage.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter text to get different formatting results.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    await processMessage();
   };
 
   const sendUpdate = () => {
@@ -184,7 +127,7 @@ ${numberedList}`;
     <div className="p-8">
       <div className="text-center mb-8">
         <h2 className="text-3xl font-bold text-slate-800 mb-2">Today's Update</h2>
-        <p className="text-slate-600">Create formatted daily updates with automatic sentence correction</p>
+        <p className="text-slate-600">Create formatted daily updates with automatic AI sentence correction</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -208,23 +151,33 @@ ${numberedList}`;
               />
             </div>
             
-            <Button 
-              onClick={processMessage}
-              disabled={isProcessing || !originalMessage.trim()}
-              className="w-full bg-blue-500 hover:bg-blue-600"
-            >
-              {isProcessing ? (
-                <>
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <Calendar className="w-4 h-4 mr-2" />
-                  Format Update
-                </>
-              )}
-            </Button>
+            <div className="flex items-center space-x-2">
+              <Button 
+                onClick={processMessage}
+                disabled={isProcessing || !originalMessage.trim()}
+                className="bg-blue-500 hover:bg-blue-600"
+              >
+                {isProcessing ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Calendar className="w-4 h-4 mr-2" />
+                    Format with AI
+                  </>
+                )}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={handleRefresh}
+                disabled={isProcessing || !originalMessage.trim()}
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Refresh
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
@@ -232,7 +185,7 @@ ${numberedList}`;
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Calendar className="w-5 h-5 text-green-500" />
-              <span>Formatted Update</span>
+              <span>AI Formatted Update</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -240,7 +193,7 @@ ${numberedList}`;
               {formattedUpdate ? (
                 <pre className="text-slate-800 whitespace-pre-wrap">{formattedUpdate}</pre>
               ) : (
-                <p className="text-slate-400 italic">Formatted update will appear here...</p>
+                <p className="text-slate-400 italic">AI formatted update will appear here...</p>
               )}
             </div>
             
