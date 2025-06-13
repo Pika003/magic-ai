@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Navigation } from '@/components/Navigation';
 import { CorrectSentence } from '@/components/CorrectSentence';
 import { ClientUpdate } from '@/components/ClientUpdate';
+import { TodaysUpdate } from '@/components/TodaysUpdate';
 
 const Index = () => {
   const [activeSection, setActiveSection] = useState('correct-sentence');
@@ -13,6 +14,8 @@ const Index = () => {
         return <CorrectSentence />;
       case 'client-update':
         return <ClientUpdate />;
+      case 'todays-update':
+        return <TodaysUpdate />;
       default:
         return <CorrectSentence />;
     }

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Users } from 'lucide-react';
+import { CheckCircle, Users, Calendar } from 'lucide-react';
 
 interface NavigationProps {
   activeSection: string;
@@ -21,6 +21,12 @@ export const Navigation = ({ activeSection, setActiveSection }: NavigationProps)
       label: 'Client Update',
       icon: Users,
       description: 'Client communication'
+    },
+    {
+      id: 'todays-update',
+      label: "Today's Update",
+      icon: Calendar,
+      description: 'Daily updates'
     }
   ];
 
