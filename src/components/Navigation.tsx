@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Clock, Users } from 'lucide-react';
+import { CheckCircle, Users } from 'lucide-react';
 
 interface NavigationProps {
   activeSection: string;
@@ -15,12 +15,6 @@ export const Navigation = ({ activeSection, setActiveSection }: NavigationProps)
       label: 'Correct Sentence',
       icon: CheckCircle,
       description: 'Instant AI correction'
-    },
-    {
-      id: 'correct-later',
-      label: 'Correct Later',
-      icon: Clock,
-      description: 'Save for later review'
     },
     {
       id: 'client-update',

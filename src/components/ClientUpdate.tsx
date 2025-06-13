@@ -12,7 +12,7 @@ interface ClientMessage {
   id: string;
   clientName: string;
   originalMessage: string;
-  correctedMessage: string;
+  formattedUpdate: string;
   sentAt: string;
   status: 'draft' | 'sent';
 }
@@ -20,14 +20,22 @@ interface ClientMessage {
 export const ClientUpdate = () => {
   const [clientName, setClientName] = useState('');
   const [originalMessage, setOriginalMessage] = useState('');
-  const [correctedMessage, setCorrectedMessage] = useState('');
+  const [formattedUpdate, setFormattedUpdate] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [clientMessages, setClientMessages] = useState<ClientMessage[]>([
     {
       id: '1',
       clientName: 'John Smith',
-      originalMessage: 'We will be meeting tomorrow at 3pm to discuss the project details.',
-      correctedMessage: 'We will be meeting tomorrow at 3:00 PM to discuss the project details.',
+      originalMessage: 'We completed the database setup. We fixed the login issue. We added new features.',
+      formattedUpdate: `Hi @John Smith,
+
+Today's Update:
+----------------
+1. We completed the database setup.
+2. We fixed the login issue.
+3. We added new features.
+
+Thanks`,
       sentAt: '2024-01-15 2:30 PM',
       status: 'sent'
     }
@@ -47,23 +55,31 @@ export const ClientUpdate = () => {
     
     // Simulate AI processing
     setTimeout(() => {
-      const improved = originalMessage
-        .replace(/\bi\b/g, 'I')
-        .replace(/\bim\b/g, "I'm")
-        .replace(/\bdont\b/g, "don't")
-        .replace(/\bcant\b/g, "can't")
-        .replace(/\bwont\b/g, "won't")
-        .replace(/(\d+)(am|pm)/gi, '$1:00 $2')
-        .replace(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, (match) => 
-          match.charAt(0).toUpperCase() + match.slice(1).toLowerCase()
-        );
+      // Split the message into sentences and format as numbered list
+      const sentences = originalMessage
+        .split(/[.!?]+/)
+        .map(s => s.trim())
+        .filter(s => s.length > 0)
+        .map(s => s.charAt(0).toUpperCase() + s.slice(1));
+
+      const numberedList = sentences
+        .map((sentence, index) => `${index + 1}. ${sentence}.`)
+        .join('\n');
+
+      const formatted = `Hi @${clientName},
+
+Today's Update:
+----------------
+${numberedList}
+
+Thanks`;
       
-      setCorrectedMessage(improved);
+      setFormattedUpdate(formatted);
       setIsProcessing(false);
       
       toast({
-        title: "Message Processed!",
-        description: "Your client message has been corrected and improved.",
+        title: "Update Formatted!",
+        description: "Your client update has been formatted professionally.",
       });
     }, 1500);
   };
@@ -73,7 +89,7 @@ export const ClientUpdate = () => {
       id: Date.now().toString(),
       clientName,
       originalMessage,
-      correctedMessage,
+      formattedUpdate,
       sentAt: new Date().toLocaleString(),
       status: 'sent'
     };
@@ -81,11 +97,11 @@ export const ClientUpdate = () => {
     setClientMessages([newMessage, ...clientMessages]);
     setClientName('');
     setOriginalMessage('');
-    setCorrectedMessage('');
+    setFormattedUpdate('');
     
     toast({
-      title: "Message Sent!",
-      description: `Professional message sent to ${clientName}.`,
+      title: "Update Sent!",
+      description: `Professional update sent to ${clientName}.`,
     });
   };
 
@@ -94,7 +110,7 @@ export const ClientUpdate = () => {
       id: Date.now().toString(),
       clientName,
       originalMessage,
-      correctedMessage,
+      formattedUpdate,
       sentAt: new Date().toLocaleString(),
       status: 'draft'
     };
@@ -102,11 +118,11 @@ export const ClientUpdate = () => {
     setClientMessages([newMessage, ...clientMessages]);
     setClientName('');
     setOriginalMessage('');
-    setCorrectedMessage('');
+    setFormattedUpdate('');
     
     toast({
       title: "Draft Saved!",
-      description: "Message saved as draft for later sending.",
+      description: "Update saved as draft for later sending.",
     });
   };
 
@@ -114,7 +130,7 @@ export const ClientUpdate = () => {
     <div className="p-8">
       <div className="text-center mb-8">
         <h2 className="text-3xl font-bold text-slate-800 mb-2">Client Update</h2>
-        <p className="text-slate-600">Create professional, corrected messages for your clients</p>
+        <p className="text-slate-600">Format your sentences into professional client updates</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -122,7 +138,7 @@ export const ClientUpdate = () => {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <MessageSquare className="w-5 h-5 text-blue-500" />
-              <span>Compose Message</span>
+              <span>Create Update</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -140,10 +156,10 @@ export const ClientUpdate = () => {
             
             <div>
               <label className="text-sm font-medium text-slate-700 mb-2 block">
-                Your Message
+                Your Updates (separate with periods)
               </label>
               <Textarea
-                placeholder="Write your message here..."
+                placeholder="We completed task A. We fixed issue B. We implemented feature C."
                 value={originalMessage}
                 onChange={(e) => setOriginalMessage(e.target.value)}
                 className="min-h-32 resize-none border-slate-200 focus:border-blue-500"
@@ -155,7 +171,7 @@ export const ClientUpdate = () => {
               disabled={isProcessing || !originalMessage.trim()}
               className="w-full bg-blue-500 hover:bg-blue-600"
             >
-              {isProcessing ? 'Processing...' : 'Process & Improve'}
+              {isProcessing ? 'Formatting...' : 'Format Update'}
             </Button>
           </CardContent>
         </Card>
@@ -164,26 +180,26 @@ export const ClientUpdate = () => {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Mail className="w-5 h-5 text-green-500" />
-              <span>Professional Version</span>
+              <span>Formatted Update</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="min-h-32 p-4 bg-green-50 border border-green-200 rounded-lg mb-4">
-              {correctedMessage ? (
-                <p className="text-slate-800 leading-relaxed">{correctedMessage}</p>
+            <div className="min-h-32 p-4 bg-green-50 border border-green-200 rounded-lg mb-4 font-mono text-sm">
+              {formattedUpdate ? (
+                <pre className="text-slate-800 whitespace-pre-wrap">{formattedUpdate}</pre>
               ) : (
-                <p className="text-slate-400 italic">Corrected message will appear here...</p>
+                <p className="text-slate-400 italic">Formatted update will appear here...</p>
               )}
             </div>
             
-            {correctedMessage && (
+            {formattedUpdate && (
               <div className="flex space-x-2">
                 <Button 
                   onClick={sendMessage}
                   className="flex-1 bg-green-500 hover:bg-green-600"
                 >
                   <Send className="w-4 h-4 mr-2" />
-                  Send Message
+                  Send Update
                 </Button>
                 <Button 
                   variant="outline"
@@ -203,10 +219,10 @@ export const ClientUpdate = () => {
           <CardTitle className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Users className="w-5 h-5 text-slate-600" />
-              <span>Message History</span>
+              <span>Update History</span>
             </div>
             <Badge variant="secondary">
-              {clientMessages.length} messages
+              {clientMessages.length} updates
             </Badge>
           </CardTitle>
         </CardHeader>
@@ -214,7 +230,7 @@ export const ClientUpdate = () => {
           {clientMessages.length === 0 ? (
             <div className="text-center py-8">
               <MessageSquare className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-              <p className="text-slate-500">No messages yet</p>
+              <p className="text-slate-500">No updates yet</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -245,8 +261,8 @@ export const ClientUpdate = () => {
                   </div>
                   
                   <div className="bg-green-50 p-3 rounded border border-green-200">
-                    <p className="text-sm font-medium text-green-700 mb-1">Professional:</p>
-                    <p className="text-green-800">{message.correctedMessage}</p>
+                    <p className="text-sm font-medium text-green-700 mb-1">Formatted Update:</p>
+                    <pre className="text-green-800 text-sm whitespace-pre-wrap font-mono">{message.formattedUpdate}</pre>
                   </div>
                 </div>
               ))}

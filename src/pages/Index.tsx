@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { Navigation } from '@/components/Navigation';
 import { CorrectSentence } from '@/components/CorrectSentence';
-import { CorrectLater } from '@/components/CorrectLater';
 import { ClientUpdate } from '@/components/ClientUpdate';
 
 const Index = () => {
@@ -12,8 +11,6 @@ const Index = () => {
     switch (activeSection) {
       case 'correct-sentence':
         return <CorrectSentence />;
-      case 'correct-later':
-        return <CorrectLater />;
       case 'client-update':
         return <ClientUpdate />;
       default:
