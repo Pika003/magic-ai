@@ -1,20 +1,42 @@
 
-const API_KEY = import.meta.env.VITE_OPENAI_KEY;
+import { supabase } from '@/integrations/supabase/client';
 
 export interface OpenAIResponse {
   correctedText: string;
   improvements: string[];
 }
 
-export const correctSentenceWithAI = async (text: string, isRefresh: boolean = false): Promise<OpenAIResponse> => {
-  if (!API_KEY) {
-    throw new Error('OpenAI API key not found. Please set VITE_OPENAI_KEY in your environment variables.');
+const getOpenAIKey = async (): Promise<string> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    throw new Error('You must be logged in to use AI features.');
   }
+
+  const { data, error } = await supabase
+    .from('user_secrets')
+    .select('secret_value')
+    .eq('user_id', user.id)
+    .eq('secret_name', 'OPENAI_API_KEY')
+    .maybeSingle();
+
+  if (error) {
+    throw new Error('Failed to retrieve API key.');
+  }
+
+  if (!data) {
+    throw new Error('OpenAI API key not found. Please add your API key in the Profile section.');
+  }
+
+  return data.secret_value;
+};
+
+export const correctSentenceWithAI = async (text: string, isRefresh: boolean = false): Promise<OpenAIResponse> => {
+  const API_KEY = await getOpenAIKey();
 
   try {
     const startTime = performance.now();
     
-    // Add variation for refresh requests
     const temperatureValue = isRefresh ? 0.7 : 0.3;
     const systemPrompt = isRefresh 
       ? 'You are a professional text editor. Correct grammar, punctuation, word spacing (like "sen tence" to "sentence"), and improve sentence structure. Provide alternative phrasing and varied improvements. Return your response as JSON with "correctedText" and "improvements" array.'
@@ -56,7 +78,6 @@ export const correctSentenceWithAI = async (text: string, isRefresh: boolean = f
     try {
       return JSON.parse(content);
     } catch {
-      // Fallback if AI doesn't return proper JSON
       return {
         correctedText: content,
         improvements: ['Grammar improved', 'Text enhanced']
@@ -64,19 +85,16 @@ export const correctSentenceWithAI = async (text: string, isRefresh: boolean = f
     }
   } catch (error) {
     console.error('OpenAI API error:', error);
-    throw new Error('Failed to process text with AI');
+    throw error;
   }
 };
 
 export const formatDailyUpdateWithAI = async (text: string, isRefresh: boolean = false): Promise<string> => {
-  if (!API_KEY) {
-    throw new Error('OpenAI API key not found. Please set VITE_OPENAI_KEY in your environment variables.');
-  }
+  const API_KEY = await getOpenAIKey();
 
   try {
     const startTime = performance.now();
     
-    // Add variation for refresh requests
     const temperatureValue = isRefresh ? 0.6 : 0.3;
     const formatVariations = [
       `Today's Update:
@@ -138,19 +156,16 @@ Correct any grammar, spacing issues (like "sen tence" to "sentence"), and improv
     return data.choices[0].message.content;
   } catch (error) {
     console.error('OpenAI API error:', error);
-    throw new Error('Failed to format update with AI');
+    throw error;
   }
 };
 
 export const generateClientUpdateWithAI = async (text: string, clientName: string, liveLink: string, isRefresh: boolean = false): Promise<string> => {
-  if (!API_KEY) {
-    throw new Error('OpenAI API key not found. Please set VITE_OPENAI_KEY in your environment variables.');
-  }
+  const API_KEY = await getOpenAIKey();
 
   try {
     const startTime = performance.now();
     
-    // Add variation for refresh requests
     const temperatureValue = isRefresh ? 0.6 : 0.4;
     const styleVariations = [
       'Create a professional client update message.',
@@ -202,6 +217,6 @@ Please format it professionally${liveLink ? ' and include the live link at the e
     return data.choices[0].message.content;
   } catch (error) {
     console.error('OpenAI API error:', error);
-    throw new Error('Failed to generate client update with AI');
+    throw error;
   }
 };
