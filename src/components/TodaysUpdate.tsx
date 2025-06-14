@@ -33,7 +33,7 @@ export const TodaysUpdate = () => {
     }
   ]);
 
-  const processMessage = async () => {
+  const processMessage = async (isRefresh: boolean = false) => {
     if (!originalMessage.trim()) {
       toast({
         title: "Error",
@@ -46,12 +46,12 @@ export const TodaysUpdate = () => {
     setIsProcessing(true);
     
     try {
-      const formatted = await formatDailyUpdateWithAI(originalMessage);
+      const formatted = await formatDailyUpdateWithAI(originalMessage, isRefresh);
       setFormattedUpdate(formatted);
       
       toast({
         title: "Update Formatted!",
-        description: "Your daily update has been corrected and formatted using AI.",
+        description: isRefresh ? "Generated a new variation of your formatted update." : "Your daily update has been corrected and formatted using AI.",
       });
     } catch (error) {
       toast({
@@ -65,16 +65,7 @@ export const TodaysUpdate = () => {
   };
 
   const handleRefresh = async () => {
-    if (!originalMessage.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter text to get different formatting results.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    await processMessage();
+    await processMessage(true);
   };
 
   const sendUpdate = () => {

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -27,7 +26,7 @@ export const ClientUpdate = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [clientUpdates, setClientUpdates] = useState<ClientUpdate[]>([]);
 
-  const processMessage = async () => {
+  const processMessage = async (isRefresh: boolean = false) => {
     if (!originalMessage.trim() || !clientName.trim()) {
       toast({
         title: "Error",
@@ -40,12 +39,12 @@ export const ClientUpdate = () => {
     setIsProcessing(true);
     
     try {
-      const formatted = await generateClientUpdateWithAI(originalMessage, clientName, liveLink);
+      const formatted = await generateClientUpdateWithAI(originalMessage, clientName, liveLink, isRefresh);
       setFormattedUpdate(formatted);
       
       toast({
         title: "Client Update Generated!",
-        description: "Your client update has been corrected and formatted using AI.",
+        description: isRefresh ? "Generated a new variation of your client update." : "Your client update has been corrected and formatted using AI.",
       });
     } catch (error) {
       toast({
@@ -59,16 +58,7 @@ export const ClientUpdate = () => {
   };
 
   const handleRefresh = async () => {
-    if (!originalMessage.trim() || !clientName.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter client name and message to get different results.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    await processMessage();
+    await processMessage(true);
   };
 
   const shareToWhatsApp = () => {

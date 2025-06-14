@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,7 +13,7 @@ export const CorrectSentence = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [corrections, setCorrections] = useState<string[]>([]);
 
-  const handleCorrection = async () => {
+  const handleCorrection = async (isRefresh: boolean = false) => {
     if (!inputText.trim()) {
       toast({
         title: "Error",
@@ -27,13 +26,13 @@ export const CorrectSentence = () => {
     setIsLoading(true);
     
     try {
-      const result = await correctSentenceWithAI(inputText);
+      const result = await correctSentenceWithAI(inputText, isRefresh);
       setCorrectedText(result.correctedText);
       setCorrections(result.improvements);
       
       toast({
         title: "Success!",
-        description: "Your sentence has been corrected using AI.",
+        description: isRefresh ? "Generated a new variation of your corrected sentence." : "Your sentence has been corrected using AI.",
       });
     } catch (error) {
       toast({
@@ -47,16 +46,7 @@ export const CorrectSentence = () => {
   };
 
   const handleRefresh = async () => {
-    if (!inputText.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a sentence to get different results.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    await handleCorrection();
+    await handleCorrection(true);
   };
 
   const copyToClipboard = (text: string) => {
@@ -97,7 +87,7 @@ export const CorrectSentence = () => {
             />
             <div className="flex items-center space-x-2 mt-4">
               <Button 
-                onClick={handleCorrection}
+                onClick={() => handleCorrection(false)}
                 disabled={isLoading || !inputText.trim()}
                 className="bg-blue-500 hover:bg-blue-600"
               >
