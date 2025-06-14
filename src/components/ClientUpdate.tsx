@@ -57,8 +57,8 @@ export const ClientUpdate = () => {
     }
   };
 
-  const handleRefresh = async () => {
-    await processMessage(true);
+  const handleRefresh = () => {
+    processMessage(true);
   };
 
   const shareToWhatsApp = () => {
@@ -185,7 +185,7 @@ export const ClientUpdate = () => {
             
             <div className="flex items-center space-x-2">
               <Button 
-                onClick={processMessage}
+                onClick={() => processMessage(false)}
                 disabled={isProcessing || !originalMessage.trim() || !clientName.trim()}
                 className="bg-blue-500 hover:bg-blue-600"
               >

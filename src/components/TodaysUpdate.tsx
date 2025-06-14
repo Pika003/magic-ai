@@ -64,8 +64,8 @@ export const TodaysUpdate = () => {
     }
   };
 
-  const handleRefresh = async () => {
-    await processMessage(true);
+  const handleRefresh = () => {
+    processMessage(true);
   };
 
   const sendUpdate = () => {
@@ -144,7 +144,7 @@ export const TodaysUpdate = () => {
             
             <div className="flex items-center space-x-2">
               <Button 
-                onClick={processMessage}
+                onClick={() => processMessage(false)}
                 disabled={isProcessing || !originalMessage.trim()}
                 className="bg-blue-500 hover:bg-blue-600"
               >
