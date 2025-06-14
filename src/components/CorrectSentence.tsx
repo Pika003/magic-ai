@@ -1,24 +1,18 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle, Wand2, Copy, RefreshCw } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { correctSentenceWithAI, isApiKeyAvailable } from '@/services/openaiService';
-import { ApiKeyInput } from './ApiKeyInput';
+import { correctSentenceWithAI } from '@/services/openaiService';
 
 export const CorrectSentence = () => {
   const [inputText, setInputText] = useState('');
   const [correctedText, setCorrectedText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [corrections, setCorrections] = useState<string[]>([]);
-  const [hasApiKey, setHasApiKey] = useState(false);
-
-  useEffect(() => {
-    setHasApiKey(isApiKeyAvailable());
-  }, []);
 
   const handleCorrection = async () => {
     if (!inputText.trim()) {
@@ -78,22 +72,6 @@ export const CorrectSentence = () => {
     setCorrectedText('');
     setCorrections([]);
   };
-
-  const handleApiKeySet = () => {
-    setHasApiKey(true);
-  };
-
-  if (!hasApiKey) {
-    return (
-      <div className="p-8">
-        <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-slate-800 mb-2">Correct Sentence</h2>
-          <p className="text-slate-600">Enter your sentence and get instant AI-powered corrections</p>
-        </div>
-        <ApiKeyInput onApiKeySet={handleApiKeySet} />
-      </div>
-    );
-  }
 
   return (
     <div className="p-8">

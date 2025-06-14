@@ -1,16 +1,5 @@
 
-// Get API key from environment variable or localStorage
-const getApiKey = (): string => {
-  // Try to get from environment variable first
-  const envKey = import.meta.env.VITE_OPENAI_KEY;
-  if (envKey) return envKey;
-  
-  // Fallback to localStorage
-  const storedKey = localStorage.getItem('openai_api_key');
-  if (storedKey) return storedKey;
-  
-  throw new Error('OpenAI API key not found. Please set VITE_OPENAI_KEY environment variable or enter your API key.');
-};
+const OPENAI_API_KEY = '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';
 
 export interface OpenAIResponse {
   correctedText: string;
@@ -18,18 +7,15 @@ export interface OpenAIResponse {
 }
 
 export const correctSentenceWithAI = async (text: string): Promise<OpenAIResponse> => {
-  const API_KEY = getApiKey();
-  
   try {
-    const startTime = performance.now();
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4.1-2025-04-14',
         messages: [
           {
             role: 'system',
@@ -51,8 +37,6 @@ export const correctSentenceWithAI = async (text: string): Promise<OpenAIRespons
 
     const data = await response.json();
     const content = data.choices[0].message.content;
-    const endTime = performance.now();
-    console.log(`OpenAI API call took ${endTime - startTime} milliseconds`);
     
     try {
       return JSON.parse(content);
@@ -70,18 +54,15 @@ export const correctSentenceWithAI = async (text: string): Promise<OpenAIRespons
 };
 
 export const formatDailyUpdateWithAI = async (text: string): Promise<string> => {
-  const API_KEY = getApiKey();
-  
   try {
-    const startTime = performance.now();
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4.1-2025-04-14',
         messages: [
           {
             role: 'system',
@@ -110,8 +91,6 @@ Correct any grammar, spacing issues (like "sen tence" to "sentence"), and improv
     }
 
     const data = await response.json();
-    const endTime = performance.now();
-    console.log(`OpenAI API call took ${endTime - startTime} milliseconds`);
     return data.choices[0].message.content;
   } catch (error) {
     console.error('OpenAI API error:', error);
@@ -120,18 +99,15 @@ Correct any grammar, spacing issues (like "sen tence" to "sentence"), and improv
 };
 
 export const generateClientUpdateWithAI = async (text: string, clientName: string, liveLink: string): Promise<string> => {
-  const API_KEY = getApiKey();
-  
   try {
-    const startTime = performance.now();
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4.1-2025-04-14',
         messages: [
           {
             role: 'system',
@@ -158,26 +134,9 @@ Please format it professionally and include the live link at the end where clien
     }
 
     const data = await response.json();
-    const endTime = performance.now();
-    console.log(`OpenAI API call took ${endTime - startTime} milliseconds`);
     return data.choices[0].message.content;
   } catch (error) {
     console.error('OpenAI API error:', error);
     throw new Error('Failed to generate client update with AI');
   }
-};
-
-// Utility function to check if API key is available
-export const isApiKeyAvailable = (): boolean => {
-  try {
-    getApiKey();
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-// Utility function to set API key in localStorage
-export const setApiKey = (key: string): void => {
-  localStorage.setItem('openai_api_key', key);
 };
