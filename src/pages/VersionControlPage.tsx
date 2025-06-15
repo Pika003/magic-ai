@@ -78,7 +78,8 @@ export const VersionControlPage = () => {
     githubConnected,
     gitlabConnected,
     loading,
-    refreshData,
+    checkConnections,
+    fetchDataForTab,
     handleDisconnect
   } = useVersionControl();
 
@@ -94,9 +95,15 @@ export const VersionControlPage = () => {
           title: `Successfully connected to ${provider}`,
           description: `Your ${provider} account has been connected.`,
         });
-        // Refresh data after successful connection
-        setTimeout(() => {
-          refreshData();
+        
+        // Refresh connections and fetch data after successful connection
+        setTimeout(async () => {
+          await checkConnections();
+          if (provider === 'github') {
+            await fetchDataForTab('github');
+          } else if (provider === 'gitlab') {
+            await fetchDataForTab('gitlab');
+          }
         }, 1000);
       } else if (status === 'error') {
         toast({
@@ -112,7 +119,16 @@ export const VersionControlPage = () => {
 
       return () => clearTimeout(timer);
     }
-  }, [location, navigate, refreshData]);
+  }, [location, navigate, checkConnections, fetchDataForTab]);
+
+  // Fetch data when tab changes
+  useEffect(() => {
+    if (activeTab === 'github' && githubConnected && githubRepos.length === 0) {
+      fetchDataForTab('github');
+    } else if (activeTab === 'gitlab' && gitlabConnected && gitlabProjects.length === 0) {
+      fetchDataForTab('gitlab');
+    }
+  }, [activeTab, githubConnected, gitlabConnected, githubRepos.length, gitlabProjects.length, fetchDataForTab]);
 
   if (loading) {
     return (
@@ -183,7 +199,7 @@ export const VersionControlPage = () => {
       <ConnectionStatus
         githubConnected={githubConnected}
         gitlabConnected={gitlabConnected}
-        onRefresh={refreshData}
+        onRefresh={checkConnections}
       />
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

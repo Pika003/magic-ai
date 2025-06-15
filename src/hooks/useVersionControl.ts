@@ -10,7 +10,6 @@ import {
 } from '@/services/versionControlService';
 import { toast } from '@/hooks/use-toast';
 
-// Narrow and independent state management per platform
 export const useVersionControl = () => {
   const [githubRepos, setGithubRepos] = useState<GitHubRepository[]>([]);
   const [gitlabProjects, setGitlabProjects] = useState<GitLabProject[]>([]);
@@ -19,7 +18,7 @@ export const useVersionControl = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Re-check connections, but fetch only on demand
+  // Check connections without fetching data
   const checkConnections = async () => {
     try {
       const [githubStatus, gitlabStatus] = await Promise.all([
@@ -29,34 +28,38 @@ export const useVersionControl = () => {
       setGithubConnected(githubStatus);
       setGitlabConnected(gitlabStatus);
     } catch (err) {
-      setError('Failed to check platform connection.');
+      console.error('Error checking connections:', err);
+      setError('Failed to check platform connections.');
     }
   };
 
   const fetchGitHubData = async () => {
+    // First check if we're actually connected
+    const isConnected = await checkConnectionStatus('github');
+    setGithubConnected(isConnected);
+    
+    if (!isConnected) {
+      setGithubRepos([]);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
-      const status = await checkConnectionStatus('github');
-      setGithubConnected(status);
-      if (status) {
-        const data = await fetchGitHubRepositories();
-        setGithubRepos(data);
-        
-        // If we got empty data, it might be due to expired token
-        if (data.length === 0) {
-          const newStatus = await checkConnectionStatus('github');
-          setGithubConnected(newStatus);
-          if (!newStatus) {
-            toast({
-              title: "GitHub Token Expired",
-              description: "Please reconnect your GitHub account to continue accessing repositories.",
-              variant: "destructive",
-            });
-          }
+      const data = await fetchGitHubRepositories();
+      setGithubRepos(data);
+      
+      // If we got empty data, check if connection is still valid
+      if (data.length === 0) {
+        const newStatus = await checkConnectionStatus('github');
+        setGithubConnected(newStatus);
+        if (!newStatus) {
+          toast({
+            title: "GitHub Token Expired",
+            description: "Please reconnect your GitHub account to continue accessing repositories.",
+            variant: "destructive",
+          });
         }
-      } else {
-        setGithubRepos([]);
       }
     } catch (e) {
       console.error("GitHub fetch error:", e);
@@ -72,29 +75,32 @@ export const useVersionControl = () => {
   };
 
   const fetchGitLabData = async () => {
+    // First check if we're actually connected
+    const isConnected = await checkConnectionStatus('gitlab');
+    setGitlabConnected(isConnected);
+    
+    if (!isConnected) {
+      setGitlabProjects([]);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
-      const status = await checkConnectionStatus('gitlab');
-      setGitlabConnected(status);
-      if (status) {
-        const data = await fetchGitLabProjects();
-        setGitlabProjects(data);
-        
-        // If we got empty data, it might be due to expired token
-        if (data.length === 0) {
-          const newStatus = await checkConnectionStatus('gitlab');
-          setGitlabConnected(newStatus);
-          if (!newStatus) {
-            toast({
-              title: "GitLab Token Expired",
-              description: "Please reconnect your GitLab account to continue accessing projects.",
-              variant: "destructive",
-            });
-          }
+      const data = await fetchGitLabProjects();
+      setGitlabProjects(data);
+      
+      // If we got empty data, check if connection is still valid
+      if (data.length === 0) {
+        const newStatus = await checkConnectionStatus('gitlab');
+        setGitlabConnected(newStatus);
+        if (!newStatus) {
+          toast({
+            title: "GitLab Token Expired",
+            description: "Please reconnect your GitLab account to continue accessing projects.",
+            variant: "destructive",
+          });
         }
-      } else {
-        setGitlabProjects([]);
       }
     } catch (e) {
       console.error("GitLab fetch error:", e);
@@ -118,13 +124,26 @@ export const useVersionControl = () => {
     }
   };
 
-  // Expose single refresh that reloads both (used by Refresh)
+  // Refresh both connections and data
   const refreshData = async () => {
     setLoading(true);
     setError(null);
+    
+    // First check connections
     await checkConnections();
-    await Promise.all([fetchGitHubData(), fetchGitLabData()]);
+    
+    // Then fetch data for connected services
+    const promises = [];
+    if (githubConnected) {
+      promises.push(fetchGitHubData());
+    }
+    if (gitlabConnected) {
+      promises.push(fetchGitLabData());
+    }
+    
+    await Promise.all(promises);
     setLoading(false);
+    
     toast({
       title: "Refreshed",
       description: "Repository data has been updated",
@@ -155,11 +174,11 @@ export const useVersionControl = () => {
     }
   };
 
-  // By default: initialize both
+  // Initialize: only check connections, don't fetch data automatically
   useEffect(() => {
     (async () => {
+      setLoading(true);
       await checkConnections();
-      await Promise.all([fetchGitHubData(), fetchGitLabData()]);
       setLoading(false);
     })();
   }, []);
