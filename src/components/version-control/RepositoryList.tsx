@@ -3,7 +3,7 @@ import React from 'react';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Github, Gitlab, ExternalLink, Lock, Globe } from 'lucide-react';
+import { Github, Gitlab, ExternalLink, Lock, Globe, User } from 'lucide-react';
 import { Repository, GitLabProject } from '@/services/versionControlService';
 
 interface RepositoryListProps {
@@ -85,12 +85,19 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
               <CardDescription className="text-sm">
                 {repo.description || 'No description available'}
               </CardDescription>
+              {repo.owner && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <User className="w-4 h-4" />
+                  <span>{repo.owner.login}</span>
+                </div>
+              )}
             </CardHeader>
             <CardContent>
               <div className="flex justify-between items-center">
                 <div className="text-sm text-muted-foreground">
                   <p>Default branch: <span className="font-medium">{repo.default_branch}</span></p>
                   <p>Updated: {new Date(repo.updated_at).toLocaleDateString()}</p>
+                  <p>Full name: <span className="font-medium">{repo.full_name}</span></p>
                 </div>
                 <Button
                   variant="outline"
@@ -146,18 +153,35 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 <Gitlab className="w-5 h-5 text-purple-600" />
                 {project.name}
               </CardTitle>
-              <Badge variant={project.visibility === 'private' ? 'secondary' : 'outline'}>
-                {project.visibility}
+              <Badge variant={project.visibility === 'private' ? 'secondary' : 'outline'} className="flex items-center gap-1">
+                {project.visibility === 'private' ? (
+                  <>
+                    <Lock className="w-3 h-3" />
+                    Private
+                  </>
+                ) : (
+                  <>
+                    <Globe className="w-3 h-3" />
+                    Public
+                  </>
+                )}
               </Badge>
             </div>
             <CardDescription className="text-sm">
               {project.description || 'No description available'}
             </CardDescription>
+            {project.namespace && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <User className="w-4 h-4" />
+                <span>{project.namespace.name}</span>
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             <div className="flex justify-between items-center">
               <div className="text-sm text-muted-foreground">
                 <p>Path: <span className="font-medium">{project.path_with_namespace}</span></p>
+                <p>Default branch: <span className="font-medium">{project.default_branch}</span></p>
                 <p>Updated: {new Date(project.last_activity_at).toLocaleDateString()}</p>
               </div>
               <Button

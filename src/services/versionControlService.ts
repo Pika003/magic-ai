@@ -11,6 +11,11 @@ export interface Repository {
   html_url: string;
   default_branch: string;
   updated_at: string;
+  visibility?: string;
+  owner?: {
+    login: string;
+    avatar_url: string;
+  };
 }
 
 export interface GitLabProject {
@@ -22,6 +27,10 @@ export interface GitLabProject {
   web_url: string;
   default_branch: string;
   last_activity_at: string;
+  namespace?: {
+    name: string;
+    full_path: string;
+  };
 }
 
 export const fetchGitHubRepositories = async (): Promise<Repository[]> => {
