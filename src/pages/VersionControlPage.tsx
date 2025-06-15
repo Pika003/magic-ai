@@ -109,12 +109,8 @@ export const VersionControlPage = () => {
       if (status === 'success') {
         toast({
           title: `Successfully connected to ${provider}`,
-          description: `Your ${provider} account has been connected. Redirecting to pricing...`,
+          description: `Your ${provider} account has been connected.`,
         });
-        // Redirect to pricing (payment) page after a brief delay
-        setTimeout(() => {
-          navigate('/payment', { replace: true });
-        }, 1600);
       } else if (status === 'error') {
         toast({
           title: `Failed to connect to ${provider}`,
@@ -122,8 +118,13 @@ export const VersionControlPage = () => {
           variant: 'destructive',
         });
       }
-      // Clean up URL
-      navigate(location.pathname, { replace: true });
+      // Clean up URL to prevent the toast from re-appearing on refresh.
+      // A small delay allows the user to read the message.
+      const timer = setTimeout(() => {
+        navigate(location.pathname, { replace: true });
+      }, 2000);
+
+      return () => clearTimeout(timer);
     }
   }, [location, navigate]);
 

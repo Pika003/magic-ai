@@ -125,11 +125,9 @@ const App = () => (
                 path="/version-control"
                 element={
                   <ProtectedRoute>
-                    <PaidUserRoute>
-                      <Layout>
-                        <VersionControlPage />
-                      </Layout>
-                    </PaidUserRoute>
+                    <Layout>
+                      <VersionControlPage />
+                    </Layout>
                   </ProtectedRoute>
                 } 
               />
