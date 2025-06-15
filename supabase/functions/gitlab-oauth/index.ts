@@ -118,6 +118,7 @@ serve(async (req: Request) => {
           access_token: tokenData.access_token,
           scope: (tokenData.scope ?? "read_user api"),
           token_type: tokenData.token_type ?? "bearer",
+          connected: true, // ALWAYS set connected true when reconnecting
         }),
       });
 

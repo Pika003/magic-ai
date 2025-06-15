@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 // Strict types for the real GitHub API objects you showed
@@ -196,11 +195,12 @@ export const disconnectProvider = async (provider: 'github' | 'gitlab'): Promise
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
-    
+
     const tableName = provider === 'github' ? 'user_github_tokens' : 'user_gitlab_tokens';
+    // Set connected to false and null out the access_token to ensure true disconnect
     await supabase
       .from(tableName)
-      .update({ connected: false })
+      .update({ connected: false, access_token: null, refresh_token: null, scope: null, token_type: null, expires_at: null, updated_at: new Date().toISOString() })
       .eq('user_id', session.user.id);
   } catch (error) {
     console.error(`Error disconnecting ${provider}:`, error);

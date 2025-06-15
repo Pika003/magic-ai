@@ -120,6 +120,7 @@ serve(async (req: Request) => {
           access_token: tokenData.access_token,
           scope: tokenData.scope,
           token_type: tokenData.token_type,
+          connected: true, // ALWAYS set connected true when reconnecting
         }),
       });
 

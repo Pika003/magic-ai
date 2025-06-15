@@ -154,6 +154,8 @@ export const useVersionControl = () => {
   const handleDisconnect = async (provider: 'github' | 'gitlab') => {
     try {
       await disconnectProvider(provider);
+
+      // After disconnect, clear state and force refresh connection status
       if (provider === 'github') {
         setGithubConnected(false);
         setGithubRepos([]);
@@ -161,6 +163,10 @@ export const useVersionControl = () => {
         setGitlabConnected(false);
         setGitlabProjects([]);
       }
+      setError(null);
+      // After this, force a check for new connection status so reconnection works
+      await checkConnections();
+
       toast({
         title: `${provider === 'github' ? 'GitHub' : 'GitLab'} Disconnected`,
         description: "You can reconnect anytime to access your repositories.",
