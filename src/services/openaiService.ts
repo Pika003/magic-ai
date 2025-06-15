@@ -12,22 +12,18 @@ const getOpenAIKey = async (): Promise<string> => {
     throw new Error('You must be logged in to use AI features.');
   }
 
-  const { data, error } = await supabase
-    .from('user_secrets')
-    .select('secret_value')
-    .eq('user_id', user.id)
-    .eq('secret_name', 'OPENAI_API_KEY')
-    .maybeSingle();
-
-  if (error) {
-    throw new Error('Failed to retrieve API key.');
+  // Call the OpenAI edge function which will use the Supabase secret
+  const response = await supabase.functions.invoke('get-openai-key');
+  
+  if (response.error) {
+    throw new Error('Failed to retrieve API key from server.');
   }
 
-  if (!data) {
-    throw new Error('OpenAI API key not found. Please add your API key in the Profile section.');
+  if (!response.data?.apiKey) {
+    throw new Error('OpenAI API key not configured on server. Please contact support.');
   }
 
-  return data.secret_value;
+  return response.data.apiKey;
 };
 
 export const correctSentenceWithAI = async (text: string, isRefresh: boolean = false): Promise<OpenAIResponse> => {
