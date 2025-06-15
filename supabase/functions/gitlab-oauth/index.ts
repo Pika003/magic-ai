@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -105,6 +104,23 @@ serve(async (req: Request) => {
         return Response.redirect(redirect.href, 302);
       }
 
+      const postData: any = {
+        user_id,
+        access_token: tokenData.access_token,
+        scope: tokenData.scope ?? "read_user api",
+        token_type: tokenData.token_type ?? "bearer",
+        connected: true,
+        updated_at: new Date().toISOString(),
+      };
+      if (tokenData.refresh_token) {
+        postData.refresh_token = tokenData.refresh_token;
+      }
+      if (tokenData.expires_in && !isNaN(Number(tokenData.expires_in))) {
+        // GitLab usually does send expires_in
+        const expiresAt = new Date(Date.now() + Number(tokenData.expires_in) * 1000).toISOString();
+        postData.expires_at = expiresAt;
+      }
+
       // Use UPSERT to handle both new connections and reconnections
       const saveResponse = await fetch(`${APP_URL}/rest/v1/user_gitlab_tokens`, {
         method: "POST",
@@ -114,13 +130,7 @@ serve(async (req: Request) => {
           "Authorization": `Bearer ${supaToken}`,
           "Prefer": "resolution=merge-duplicates",
         },
-        body: JSON.stringify({
-          user_id,
-          access_token: tokenData.access_token,
-          scope: (tokenData.scope ?? "read_user api"),
-          token_type: tokenData.token_type ?? "bearer",
-          connected: true,
-        }),
+        body: JSON.stringify(postData),
       });
 
       if (!saveResponse.ok) {

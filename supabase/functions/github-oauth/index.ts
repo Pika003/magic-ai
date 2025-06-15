@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -100,11 +99,22 @@ serve(async (req: Request) => {
         return Response.redirect(redirect.href, 302);
       }
 
-      // Save tokens to Supabase via rest API
-      const user_id = parseJwt(supaToken).sub;
-      if (!user_id) {
-        const redirect = new URL(`/version-control?provider=github&status=error&message=NoUserId`, FRONTEND_URL);
-        return Response.redirect(redirect.href, 302);
+      // Prepare the data object, including refresh_token if present
+      const postData: any = {
+        user_id: parseJwt(supaToken).sub,
+        access_token: tokenData.access_token,
+        scope: tokenData.scope,
+        token_type: tokenData.token_type,
+        connected: true,
+        updated_at: new Date().toISOString(),
+      };
+      if (tokenData.refresh_token) {
+        postData.refresh_token = tokenData.refresh_token;
+      }
+      if (tokenData.expires_in && !isNaN(Number(tokenData.expires_in))) {
+        // GitHub typically doesn't send expires_in, but just in case
+        const expiresAt = new Date(Date.now() + Number(tokenData.expires_in) * 1000).toISOString();
+        postData.expires_at = expiresAt;
       }
 
       // Use UPSERT to handle both new connections and reconnections
@@ -116,13 +126,7 @@ serve(async (req: Request) => {
           "Authorization": `Bearer ${supaToken}`,
           "Prefer": "resolution=merge-duplicates",
         },
-        body: JSON.stringify({
-          user_id,
-          access_token: tokenData.access_token,
-          scope: tokenData.scope,
-          token_type: tokenData.token_type,
-          connected: true,
-        }),
+        body: JSON.stringify(postData),
       });
 
       if (!saveResponse.ok) {
