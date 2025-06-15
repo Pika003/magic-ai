@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { User, Settings, Key, Save } from 'lucide-react';
 import { Navigation } from '@/components/Navigation';
+import { GoogleCalendarIntegration } from '@/components/GoogleCalendarIntegration';
 
 interface Profile {
   id: string;
@@ -172,13 +173,13 @@ export const ProfilePage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <Navigation />
-      <div className="pt-16 p-8 max-w-4xl mx-auto">
+      <div className="pt-16 p-8 max-w-6xl mx-auto">
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-slate-800 mb-2">Profile Settings</h2>
-          <p className="text-slate-600">Manage your account and API settings</p>
+          <p className="text-slate-600">Manage your account, API settings, and integrations</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -280,6 +281,8 @@ export const ProfilePage = () => {
               </div>
             </CardContent>
           </Card>
+
+          <GoogleCalendarIntegration />
         </div>
       </div>
     </div>
