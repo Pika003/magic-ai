@@ -3,8 +3,9 @@ import React from 'react';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Github, Gitlab } from 'lucide-react';
+import { Github, Gitlab, Copy } from 'lucide-react';
 import { GitHubRepository, GitLabProject } from '@/services/versionControlService';
+import { toast } from '@/hooks/use-toast';
 
 interface RepositoryListProps {
   githubRepos?: GitHubRepository[];
@@ -25,6 +26,15 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 }) => {
   // Early error display
   if (error) return <div className="text-red-500">{error}</div>;
+
+  // Helper: copy to clipboard with toast
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Copied!",
+      description: "Clone URL copied to clipboard.",
+    });
+  }
 
   if (activeTab === 'github') {
     if (!githubConnected) {
@@ -94,7 +104,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                   <span className="font-medium mr-2">Clone URL:</span>
                   <span className="break-all">{repo.clone_url}</span>
                 </div>
-                <div className="flex gap-2 mt-1">
+                <div className="flex gap-2 mt-2">
                   {repo.html_url && (
                     <Button
                       variant="outline"
@@ -108,12 +118,14 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                   )}
                   {repo.clone_url && (
                     <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => navigator.clipboard.writeText(repo.clone_url)}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCopy(repo.clone_url)}
                       title="Copy Clone URL"
+                      className="flex items-center gap-1 border ml-0.5"
                     >
-                      <span className="material-icons">content_copy</span>
+                      <Copy className="h-4 w-4" />
+                      <span className="pl-1">Copy</span>
                     </Button>
                   )}
                 </div>
@@ -199,7 +211,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 <span className="font-medium mr-2">SSH URL:</span>
                 <span className="break-all">{project.ssh_url_to_repo || '-'}</span>
               </div>
-              <div className="flex gap-2 mt-1">
+              <div className="flex gap-2 mt-2">
                 {project.web_url && (
                   <Button
                     variant="outline"
@@ -213,22 +225,26 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 )}
                 {project.http_url_to_repo && (
                   <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => navigator.clipboard.writeText(project.http_url_to_repo)}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleCopy(project.http_url_to_repo)}
                     title="Copy HTTP Clone URL"
+                    className="flex items-center gap-1 border ml-0.5"
                   >
-                    <span className="material-icons">content_copy</span>
+                    <Copy className="h-4 w-4" />
+                    <span className="pl-1">Copy</span>
                   </Button>
                 )}
                 {project.ssh_url_to_repo && (
                   <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => navigator.clipboard.writeText(project.ssh_url_to_repo)}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleCopy(project.ssh_url_to_repo)}
                     title="Copy SSH URL"
+                    className="flex items-center gap-1 border ml-0.5"
                   >
-                    <span className="material-icons">content_copy</span>
+                    <Copy className="h-4 w-4" />
+                    <span className="pl-1">Copy</span>
                   </Button>
                 )}
               </div>
@@ -241,3 +257,4 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 };
 
 // This file is getting long; further splitting into subcomponents is recommended if changes continue.
+
