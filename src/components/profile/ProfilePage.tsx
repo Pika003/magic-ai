@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { User, Settings, Key, Save } from 'lucide-react';
+import { Navigation } from '@/components/Navigation';
 
 interface Profile {
   id: string;
@@ -159,121 +160,127 @@ export const ProfilePage = () => {
 
   if (loading) {
     return (
-      <div className="p-8">
-        <div className="animate-pulse">Loading profile...</div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <Navigation />
+        <div className="pt-16 p-8">
+          <div className="animate-pulse">Loading profile...</div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold text-slate-800 mb-2">Profile Settings</h2>
-        <p className="text-slate-600">Manage your account and API settings</p>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <Navigation />
+      <div className="pt-16 p-8 max-w-4xl mx-auto">
+        <div className="mb-8">
+          <h2 className="text-3xl font-bold text-slate-800 mb-2">Profile Settings</h2>
+          <p className="text-slate-600">Manage your account and API settings</p>
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <User className="w-5 h-5 text-blue-500" />
-              <span>Profile Information</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={updateProfile} className="space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <User className="w-5 h-5 text-blue-500" />
+                <span>Profile Information</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={updateProfile} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={user?.email || ''}
+                    disabled
+                    className="bg-slate-50"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="fullName">Full Name</Label>
+                  <Input
+                    id="fullName"
+                    type="text"
+                    placeholder="Enter your full name"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="username">Username</Label>
+                  <Input
+                    id="username"
+                    type="text"
+                    placeholder="Choose a username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                  />
+                </div>
+                
+                <Button type="submit" disabled={saving} className="w-full">
+                  {saving ? (
+                    "Saving..."
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Profile
+                    </>
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Key className="w-5 h-5 text-green-500" />
+                <span>API Configuration</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="openaiKey">OpenAI API Key</Label>
                 <Input
-                  id="email"
-                  type="email"
-                  value={user?.email || ''}
-                  disabled
-                  className="bg-slate-50"
+                  id="openaiKey"
+                  type="password"
+                  placeholder="Enter your OpenAI API key"
+                  value={openaiKey}
+                  onChange={(e) => setOpenaiKey(e.target.value)}
                 />
+                <p className="text-sm text-slate-500">
+                  Your API key is stored securely and encrypted in the database.
+                </p>
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name</Label>
-                <Input
-                  id="fullName"
-                  type="text"
-                  placeholder="Enter your full name"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="username">Username</Label>
-                <Input
-                  id="username"
-                  type="text"
-                  placeholder="Choose a username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                />
-              </div>
-              
-              <Button type="submit" disabled={saving} className="w-full">
-                {saving ? (
+              <Button 
+                onClick={saveOpenAIKey} 
+                disabled={keyLoading || !openaiKey.trim()}
+                className="w-full bg-green-500 hover:bg-green-600"
+              >
+                {keyLoading ? (
                   "Saving..."
                 ) : (
                   <>
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Profile
+                    <Key className="w-4 h-4 mr-2" />
+                    Save API Key
                   </>
                 )}
               </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Key className="w-5 h-5 text-green-500" />
-              <span>API Configuration</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="openaiKey">OpenAI API Key</Label>
-              <Input
-                id="openaiKey"
-                type="password"
-                placeholder="Enter your OpenAI API key"
-                value={openaiKey}
-                onChange={(e) => setOpenaiKey(e.target.value)}
-              />
-              <p className="text-sm text-slate-500">
-                Your API key is stored securely and encrypted in the database.
-              </p>
-            </div>
-            
-            <Button 
-              onClick={saveOpenAIKey} 
-              disabled={keyLoading || !openaiKey.trim()}
-              className="w-full bg-green-500 hover:bg-green-600"
-            >
-              {keyLoading ? (
-                "Saving..."
-              ) : (
-                <>
-                  <Key className="w-4 h-4 mr-2" />
-                  Save API Key
-                </>
-              )}
-            </Button>
-            
-            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-              <h4 className="font-medium text-blue-800 mb-1">Why is this needed?</h4>
-              <p className="text-sm text-blue-700">
-                Your OpenAI API key enables the AI text correction features. It's stored securely and only accessible by you.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+              
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                <h4 className="font-medium text-blue-800 mb-1">Why is this needed?</h4>
+                <p className="text-sm text-blue-700">
+                  Your OpenAI API key enables the AI text correction features. It's stored securely and only accessible by you.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
