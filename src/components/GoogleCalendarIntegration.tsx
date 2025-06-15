@@ -9,7 +9,7 @@ import { toast } from '@/hooks/use-toast';
 import {
   initializeGoogleAPI,
   authenticateGoogleCalendar,
-  getUpcomingEvents,
+  getTodaysEvents,
   checkGoogleCalendarConnection,
   CalendarEvent
 } from '@/services/googleCalendarService';
@@ -18,7 +18,7 @@ export const GoogleCalendarIntegration = () => {
   const { user } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [upcomingEvents, setUpcomingEvents] = useState<CalendarEvent[]>([]);
+  const [todaysEvents, setTodaysEvents] = useState<CalendarEvent[]>([]);
   const [apiInitialized, setApiInitialized] = useState(false);
 
   useEffect(() => {
@@ -26,7 +26,6 @@ export const GoogleCalendarIntegration = () => {
       checkConnection();
       initAPI();
     }
-    // eslint-disable-next-line
   }, [user]);
 
   const initAPI = async () => {
@@ -48,23 +47,26 @@ export const GoogleCalendarIntegration = () => {
     
     const connected = await checkGoogleCalendarConnection(user.id);
     setIsConnected(connected);
+    
     if (connected) {
-      fetchUpcomingEvents();
+      fetchTodaysEvents();
     }
   };
 
   const connectGoogleCalendar = async () => {
     if (!user || !apiInitialized) return;
+
     setLoading(true);
     try {
       const result = await authenticateGoogleCalendar(user.id);
+      
       if (result.success) {
         setIsConnected(true);
         toast({
           title: "Success",
           description: "Google Calendar connected successfully!"
         });
-        fetchUpcomingEvents();
+        fetchTodaysEvents();
       } else {
         toast({
           title: "Error",
@@ -83,11 +85,12 @@ export const GoogleCalendarIntegration = () => {
     }
   };
 
-  const fetchUpcomingEvents = async () => {
+  const fetchTodaysEvents = async () => {
     if (!user) return;
+
     try {
-      const events = await getUpcomingEvents(user.id, 3); // fetch next 3
-      setUpcomingEvents(events);
+      const events = await getTodaysEvents(user.id);
+      setTodaysEvents(events);
     } catch (error) {
       console.error('Error fetching events:', error);
     }
@@ -110,7 +113,7 @@ export const GoogleCalendarIntegration = () => {
         {!isConnected ? (
           <div className="space-y-3">
             <p className="text-sm text-slate-600">
-              Connect your Google Calendar to see your upcoming meetings and get notifications.
+              Connect your Google Calendar to see today's meetings and get notifications.
             </p>
             <Button 
               onClick={connectGoogleCalendar} 
@@ -129,7 +132,7 @@ export const GoogleCalendarIntegration = () => {
                 </Badge>
               </div>
               <Button 
-                onClick={fetchUpcomingEvents} 
+                onClick={fetchTodaysEvents} 
                 variant="outline" 
                 size="sm"
               >
@@ -138,13 +141,13 @@ export const GoogleCalendarIntegration = () => {
             </div>
 
             <div className="space-y-3">
-              <h4 className="font-medium text-slate-800">Upcoming Meetings</h4>
+              <h4 className="font-medium text-slate-800">Today's Meetings</h4>
               
-              {upcomingEvents.length === 0 ? (
-                <p className="text-sm text-slate-500">No upcoming meetings found.</p>
+              {todaysEvents.length === 0 ? (
+                <p className="text-sm text-slate-500">No meetings scheduled for today.</p>
               ) : (
                 <div className="space-y-2">
-                  {upcomingEvents.map((event) => (
+                  {todaysEvents.map((event) => (
                     <div 
                       key={event.id} 
                       className="p-3 bg-slate-50 rounded-lg border border-slate-200"
