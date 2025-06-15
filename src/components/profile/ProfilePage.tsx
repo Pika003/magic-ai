@@ -163,7 +163,7 @@ export const ProfilePage = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
         <Navigation />
-        <div className="pt-10 px-4 md:px-10">
+        <div className="pt-10 px-2 md:px-4">
           <div className="animate-pulse">Loading profile...</div>
         </div>
       </div>
@@ -173,15 +173,16 @@ export const ProfilePage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <Navigation />
-      <div className="pt-10 px-4 md:px-10 max-w-6xl mx-auto">
+      <div className="pt-10 px-2 md:px-4 max-w-7xl mx-auto">
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-slate-800 mb-2">Profile Settings</h2>
           <p className="text-slate-600">Manage your account, API settings, and integrations</p>
         </div>
-        {/* Main row: Profile info & Usage bar side by side */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
-          <div>
-            <Card>
+        
+        {/* Profile Info & Usage Stats Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div className="lg:col-span-2">
+            <Card className="h-full">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <User className="w-5 h-5 text-blue-500" />
@@ -234,12 +235,14 @@ export const ProfilePage = () => {
               </CardContent>
             </Card>
           </div>
+          
           <div className="flex items-stretch">
             <UsageStatsCard />
           </div>
         </div>
-        {/* Remaining 2 cards in a row below, consistent grid/padding */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        
+        {/* API Configuration & Integrations Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -283,6 +286,7 @@ export const ProfilePage = () => {
               </div>
             </CardContent>
           </Card>
+          
           <Card>
             <GoogleCalendarIntegration />
           </Card>

@@ -53,7 +53,7 @@ const handleOAuthStart = async (provider: 'github' | 'gitlab') => {
 };
 
 export const VersionControlPage = () => (
-  <div className="w-full h-full">
+  <div className="w-full h-full pt-10">
     <div className="mb-6">
       <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
         <GitBranch className="w-7 h-7 text-blue-500" />
