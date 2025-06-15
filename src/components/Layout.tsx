@@ -17,8 +17,8 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
           </div>
         )}
         <main className={`flex-1 pt-10 px-2 md:px-4 ${user ? 'md:ml-64' : ''}`}>
-          {/* Wrap children in a max-w-7xl container and center */}
-          <div className="max-w-7xl mx-auto w-full">
+          {/* Removed max-w-7xl mx-auto container for correct full-width */}
+          <div className="w-full">
             {children}
           </div>
         </main>
