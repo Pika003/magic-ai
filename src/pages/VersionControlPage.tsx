@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Card,
@@ -8,12 +8,17 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Github,
   Gitlab,
   GitBranch,
   GitPullRequest,
+  Plus,
 } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 const GITHUB_SECTIONS = [
   { label: "Repositories", icon: Github, desc: "Manage your GitHub repositories" },
@@ -32,98 +37,309 @@ const GITLAB_SECTIONS = [
 ];
 
 const handleOAuthStart = async (provider: 'github' | 'gitlab') => {
-  // Call the edge function to get the OAuth URL, and redirect
+  // Fixed OAuth endpoints - removed extra path segments
   let endpoint = '';
   if (provider === 'github') {
-    endpoint = 'https://wrvobkcgxmemexernxne.functions.supabase.co/github-oauth/start';
+    endpoint = 'https://wrvobkcgxmemexernxne.supabase.co/functions/v1/github-oauth/start';
   } else {
-    endpoint = 'https://wrvobkcgxmemexernxne.functions.supabase.co/gitlab-oauth/start';
+    endpoint = 'https://wrvobkcgxmemexernxne.supabase.co/functions/v1/gitlab-oauth/start';
   }
+  
   try {
     const res = await fetch(endpoint, { method: "GET" });
     const data = await res.json();
     if (data.url) {
       window.location.href = data.url;
     } else {
-      alert("Failed to get OAuth URL.");
+      toast({
+        title: "OAuth Error",
+        description: "Failed to get OAuth URL. Please try again.",
+        variant: "destructive"
+      });
     }
-  } catch {
-    alert("Error connecting to OAuth.");
+  } catch (error) {
+    toast({
+      title: "Connection Error",
+      description: "Error connecting to OAuth service.",
+      variant: "destructive"
+    });
   }
 };
 
-export const VersionControlPage = () => (
-  <div className="w-full h-full pt-10">
-    <div className="mb-6">
-      <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
-        <GitBranch className="w-7 h-7 text-blue-500" />
-        Version Control Management
-      </h1>
-      <p className="text-muted-foreground">
-        Manage your GitHub and GitLab repositories, branches, commits, and utilize AI-powered features.
-      </p>
-    </div>
-    
-    <div className="flex gap-4 mb-6">
-      <button
-        onClick={() => handleOAuthStart("github")}
-        className="bg-black text-white px-4 py-2 rounded shadow flex items-center gap-2 hover:bg-gray-900"
-      >
-        <Github className="w-5 h-5" />
-        Connect GitHub
-      </button>
-      <button
-        onClick={() => handleOAuthStart("gitlab")}
-        className="bg-[#fca326] text-white px-4 py-2 rounded shadow flex items-center gap-2 hover:bg-[#e09b1f]"
-      >
-        <Gitlab className="w-5 h-5" />
-        Connect GitLab
-      </button>
-    </div>
-    
-    <Tabs defaultValue="github" className="w-full">
-      <TabsList className="mb-6">
-        <TabsTrigger value="github" className="flex items-center gap-2">
-          <Github className="w-5 h-5" /> GitHub
-        </TabsTrigger>
-        <TabsTrigger value="gitlab" className="flex items-center gap-2">
-          <Gitlab className="w-5 h-5" /> GitLab
-        </TabsTrigger>
-      </TabsList>
-      <TabsContent value="github">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {GITHUB_SECTIONS.map((section) => (
-            <Card key={section.label}>
-              <CardHeader className="flex flex-row items-center gap-2 pb-2">
-                <section.icon className="w-5 h-5 text-blue-600" />
-                <CardTitle>{section.label}</CardTitle>
+export const VersionControlPage = () => {
+  const [newRepoName, setNewRepoName] = useState("");
+  const [newBranchName, setNewBranchName] = useState("");
+  const [commitMessage, setCommitMessage] = useState("");
+  const [repositories, setRepositories] = useState<string[]>([]);
+  const [branches, setBranches] = useState<string[]>([]);
+
+  // Mock data for demonstration
+  useEffect(() => {
+    setRepositories(["my-awesome-project", "frontend-app", "backend-api"]);
+    setBranches(["main", "develop", "feature/auth", "hotfix/bug-123"]);
+  }, []);
+
+  const handleAddRepository = () => {
+    if (newRepoName.trim()) {
+      setRepositories(prev => [...prev, newRepoName.trim()]);
+      setNewRepoName("");
+      toast({
+        title: "Repository Added",
+        description: `Repository "${newRepoName}" has been added.`,
+      });
+    }
+  };
+
+  const handleCreateBranch = () => {
+    if (newBranchName.trim()) {
+      setBranches(prev => [...prev, newBranchName.trim()]);
+      setNewBranchName("");
+      toast({
+        title: "Branch Created",
+        description: `Branch "${newBranchName}" has been created.`,
+      });
+    }
+  };
+
+  const handleCommit = () => {
+    if (commitMessage.trim()) {
+      toast({
+        title: "Commit Created",
+        description: `Commit: "${commitMessage}" has been created.`,
+      });
+      setCommitMessage("");
+    }
+  };
+
+  return (
+    <div className="w-full h-full pt-10">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
+          <GitBranch className="w-7 h-7 text-blue-500" />
+          Version Control Management
+        </h1>
+        <p className="text-muted-foreground">
+          Manage your GitHub and GitLab repositories, branches, commits, and utilize AI-powered features.
+        </p>
+      </div>
+      
+      <div className="flex gap-4 mb-6">
+        <Button
+          onClick={() => handleOAuthStart("github")}
+          className="bg-black text-white px-4 py-2 rounded shadow flex items-center gap-2 hover:bg-gray-900"
+        >
+          <Github className="w-5 h-5" />
+          Connect GitHub
+        </Button>
+        <Button
+          onClick={() => handleOAuthStart("gitlab")}
+          className="bg-[#fca326] text-white px-4 py-2 rounded shadow flex items-center gap-2 hover:bg-[#e09b1f]"
+        >
+          <Gitlab className="w-5 h-5" />
+          Connect GitLab
+        </Button>
+      </div>
+      
+      <Tabs defaultValue="github" className="w-full">
+        <TabsList className="mb-6">
+          <TabsTrigger value="github" className="flex items-center gap-2">
+            <Github className="w-5 h-5" /> GitHub
+          </TabsTrigger>
+          <TabsTrigger value="gitlab" className="flex items-center gap-2">
+            <Gitlab className="w-5 h-5" /> GitLab
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="github">
+          <div className="space-y-6">
+            {/* Quick Actions */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Plus className="w-5 h-5" />
+                  Quick Actions
+                </CardTitle>
               </CardHeader>
-              <CardContent>
-                <CardDescription>{section.desc}</CardDescription>
-                <div className="text-xs text-slate-400 mt-2">Coming soon...</div>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="repo-name">Add Repository</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="repo-name"
+                        placeholder="Repository name"
+                        value={newRepoName}
+                        onChange={(e) => setNewRepoName(e.target.value)}
+                      />
+                      <Button onClick={handleAddRepository}>Add</Button>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="branch-name">Create Branch</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="branch-name"
+                        placeholder="Branch name"
+                        value={newBranchName}
+                        onChange={(e) => setNewBranchName(e.target.value)}
+                      />
+                      <Button onClick={handleCreateBranch}>Create</Button>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="commit-msg">Quick Commit</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="commit-msg"
+                        placeholder="Commit message"
+                        value={commitMessage}
+                        onChange={(e) => setCommitMessage(e.target.value)}
+                      />
+                      <Button onClick={handleCommit}>Commit</Button>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
-      </TabsContent>
-      <TabsContent value="gitlab">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {GITLAB_SECTIONS.map((section) => (
-            <Card key={section.label}>
-              <CardHeader className="flex flex-row items-center gap-2 pb-2">
-                <section.icon className="w-5 h-5 text-purple-600" />
-                <CardTitle>{section.label}</CardTitle>
+
+            {/* Repositories List */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Repositories</CardTitle>
+                <CardDescription>Your GitHub repositories</CardDescription>
               </CardHeader>
               <CardContent>
-                <CardDescription>{section.desc}</CardDescription>
-                <div className="text-xs text-slate-400 mt-2">Coming soon...</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {repositories.map((repo, index) => (
+                    <div key={index} className="p-3 border rounded-lg hover:bg-slate-50">
+                      <div className="flex items-center gap-2">
+                        <Github className="w-4 h-4 text-blue-600" />
+                        <span className="font-medium">{repo}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
-      </TabsContent>
-    </Tabs>
-  </div>
-);
+
+            {/* Branches List */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Branches</CardTitle>
+                <CardDescription>Available branches</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {branches.map((branch, index) => (
+                    <div key={index} className="p-3 border rounded-lg hover:bg-slate-50">
+                      <div className="flex items-center gap-2">
+                        <GitBranch className="w-4 h-4 text-green-600" />
+                        <span className="font-medium">{branch}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Feature Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {GITHUB_SECTIONS.map((section) => (
+                <Card key={section.label}>
+                  <CardHeader className="flex flex-row items-center gap-2 pb-2">
+                    <section.icon className="w-5 h-5 text-blue-600" />
+                    <CardTitle>{section.label}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription>{section.desc}</CardDescription>
+                    <Button className="mt-3" variant="outline" size="sm">
+                      Manage
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="gitlab">
+          <div className="space-y-6">
+            {/* Quick Actions - Similar to GitHub */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Plus className="w-5 h-5" />
+                  Quick Actions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="gitlab-repo">Add Project</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="gitlab-repo"
+                        placeholder="Project name"
+                        value={newRepoName}
+                        onChange={(e) => setNewRepoName(e.target.value)}
+                      />
+                      <Button onClick={handleAddRepository}>Add</Button>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="gitlab-branch">Create Branch</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="gitlab-branch"
+                        placeholder="Branch name"
+                        value={newBranchName}
+                        onChange={(e) => setNewBranchName(e.target.value)}
+                      />
+                      <Button onClick={handleCreateBranch}>Create</Button>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="gitlab-commit">Quick Commit</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="gitlab-commit"
+                        placeholder="Commit message"
+                        value={commitMessage}
+                        onChange={(e) => setCommitMessage(e.target.value)}
+                      />
+                      <Button onClick={handleCommit}>Commit</Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Feature Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {GITLAB_SECTIONS.map((section) => (
+                <Card key={section.label}>
+                  <CardHeader className="flex flex-row items-center gap-2 pb-2">
+                    <section.icon className="w-5 h-5 text-purple-600" />
+                    <CardTitle>{section.label}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription>{section.desc}</CardDescription>
+                    <Button className="mt-3" variant="outline" size="sm">
+                      Manage
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+};
 
 export default VersionControlPage;
