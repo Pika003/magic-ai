@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { GitBranch, Github, Gitlab } from "lucide-react";
+import { GitBranch, Github, Gitlab, Plus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useVersionControl } from "@/hooks/useVersionControl";
@@ -69,6 +69,7 @@ const handleOAuthStart = async (provider: 'github' | 'gitlab') => {
 };
 
 export const VersionControlPage = () => {
+  const [activeTab, setActiveTab] = useState("github");
   const location = useLocation();
   const navigate = useNavigate();
   const {
@@ -77,9 +78,7 @@ export const VersionControlPage = () => {
     githubConnected,
     gitlabConnected,
     loading,
-    activeTab,
-    refreshData,
-    switchTab
+    refreshData
   } = useVersionControl();
 
   useEffect(() => {
@@ -159,7 +158,7 @@ export const VersionControlPage = () => {
         onRefresh={refreshData}
       />
       
-      <Tabs value={activeTab} onValueChange={switchTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="mb-6">
           <TabsTrigger value="github" className="flex items-center gap-2">
             <Github className="w-5 h-5" /> GitHub ({githubRepos.length})

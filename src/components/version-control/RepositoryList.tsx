@@ -1,12 +1,11 @@
 
-import React, { useState, useMemo } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Github, Gitlab, Search } from 'lucide-react';
-import { GitHubRepository, GitLabProject } from '@/services/versionControlService';
-import { GitHubRepoCard } from './GitHubRepoCard';
-import { GitLabProjectCard } from './GitLabProjectCard';
-import { RepoDetailsModal } from './RepoDetailsModal';
+import React from 'react';
+import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Github, Gitlab, Copy } from 'lucide-react';
+import { GitHubRepository, GitLabProject } from '@/services/versionControlService';
+import { toast } from '@/hooks/use-toast';
 
 interface RepositoryListProps {
   githubRepos?: GitHubRepository[];
@@ -17,14 +16,6 @@ interface RepositoryListProps {
   error?: string | null;
 }
 
-const PAGE_SIZE = 8; // items per page
-
-type SortingOption = "updated" | "name";
-const SORT_OPTIONS: { label: string; value: SortingOption }[] = [
-  { label: "Recently Updated", value: "updated" },
-  { label: "Name (A-Z)", value: "name" },
-];
-
 export const RepositoryList: React.FC<RepositoryListProps> = ({
   githubRepos = [],
   gitlabProjects = [],
@@ -33,73 +24,18 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   activeTab,
   error,
 }) => {
-  // Universal
-  const [search, setSearch] = useState("");
-  const [sorting, setSorting] = useState<SortingOption>("updated");
-  const [page, setPage] = useState(1);
-  const [modalRepo, setModalRepo] = useState<GitHubRepository | GitLabProject | null>(null);
-
-  // Filtering & Sorting (GitHub)
-  const filteredGithubRepos = useMemo(() => {
-    let filtered = githubRepos;
-    if (search.trim())
-      filtered = filtered.filter(repo =>
-        repo.name.toLowerCase().includes(search.toLowerCase()) ||
-        repo.full_name.toLowerCase().includes(search.toLowerCase()) ||
-        (repo.description || '').toLowerCase().includes(search.toLowerCase())
-      );
-    if (sorting === "name") {
-      filtered = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
-    } else if (sorting === "updated") {
-      filtered = [...filtered].sort((a, b) => {
-        const aTime = a.updated_at ? new Date(a.updated_at).getTime() : 0;
-        const bTime = b.updated_at ? new Date(b.updated_at).getTime() : 0;
-        return bTime - aTime;
-      });
-    }
-    return filtered;
-  }, [githubRepos, search, sorting]);
-
-  // Filtering & Sorting (GitLab)
-  const filteredGitlabProjects = useMemo(() => {
-    let filtered = gitlabProjects;
-    if (search.trim())
-      filtered = filtered.filter(project =>
-        project.name.toLowerCase().includes(search.toLowerCase()) ||
-        (project.description || '').toLowerCase().includes(search.toLowerCase()) ||
-        (project.path_with_namespace || '').toLowerCase().includes(search.toLowerCase())
-      );
-    if (sorting === "name") {
-      filtered = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
-    } else if (sorting === "updated") {
-      filtered = [...filtered].sort((a, b) => {
-        const aTime = a.updated_at ? new Date(a.updated_at).getTime() : 0;
-        const bTime = b.updated_at ? new Date(b.updated_at).getTime() : 0;
-        return bTime - aTime;
-      });
-    }
-    return filtered;
-  }, [gitlabProjects, search, sorting]);
-
-  // Pagination
-  const paginatedGithubRepos = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE;
-    return filteredGithubRepos.slice(start, start + PAGE_SIZE);
-  }, [filteredGithubRepos, page]);
-
-  const paginatedGitlabProjects = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE;
-    return filteredGitlabProjects.slice(start, start + PAGE_SIZE);
-  }, [filteredGitlabProjects, page]);
-
-  const totalGithubPages = Math.ceil(filteredGithubRepos.length / PAGE_SIZE) || 1;
-  const totalGitlabPages = Math.ceil(filteredGitlabProjects.length / PAGE_SIZE) || 1;
-
-  // Modal close
-  const closeModal = () => setModalRepo(null);
-
-  // Active platform handling
+  // Early error display
   if (error) return <div className="text-red-500">{error}</div>;
+
+  // Helper: copy to clipboard with toast
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Copied!",
+      description: "Clone URL copied to clipboard.",
+    });
+  }
+
   if (activeTab === 'github') {
     if (!githubConnected) {
       return (
@@ -113,85 +49,95 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
         </Card>
       );
     }
-    return (
-      <div>
-        {/* Filter/Sort Controls */}
-        <div className="mb-4 flex flex-wrap gap-2">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-2 top-2.5 w-4 h-4 text-muted-foreground" />
-            <input
-              className="border rounded pl-8 pr-2 py-1 w-full text-sm"
-              placeholder="Search repositories..."
-              value={search}
-              onChange={e => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
-            />
-          </div>
-          <div>
-            <label className="text-xs text-muted-foreground mr-1">Sort</label>
-            <select
-              className="border rounded px-2 py-1 text-xs"
-              value={sorting}
-              onChange={e => setSorting(e.target.value as SortingOption)}
-            >
-              {SORT_OPTIONS.map(s => (
-                <option value={s.value} key={s.value}>{s.label}</option>
-              ))}
-            </select>
-          </div>
+    if (!githubRepos.length) {
+      return (
+        <div>
+          <p className="text-muted-foreground">No repositories found</p>
         </div>
-        {/* List */}
-        {filteredGithubRepos.length === 0 ? (
-          <div>
-            <p className="text-muted-foreground">No repositories found{githubRepos.length ? " (filtered)" : ""}</p>
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {paginatedGithubRepos.map((repo) => (
-                <div key={repo.id} className="relative group">
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    className="cursor-pointer"
-                    onClick={() => setModalRepo(repo)}
-                    onKeyDown={e => { if (e.key === "Enter") setModalRepo(repo); }}
-                  >
-                    <GitHubRepoCard repo={repo} />
-                  </div>
+      );
+    }
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {githubRepos.map((repo) => (
+          <Card key={repo.id}>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Github className="w-5 h-5 text-blue-600" />
+                  {repo.name}
+                  {repo.archived && <Badge variant="secondary" className="ml-2">Archived</Badge>}
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  {(repo.private)
+                    ? <Badge variant="secondary">Private</Badge>
+                    : <Badge variant="outline">Public</Badge>}
                 </div>
-              ))}
-            </div>
-            {/* Pagination Controls */}
-            {totalGithubPages > 1 && (
-              <div className="flex justify-center gap-2 mt-4">
-                <Button size="sm" disabled={page === 1} onClick={() => setPage(page - 1)}>
-                  Previous
-                </Button>
-                <span className="px-2 text-sm">{page} / {totalGithubPages}</span>
-                <Button size="sm" disabled={page === totalGithubPages} onClick={() => setPage(page + 1)}>
-                  Next
-                </Button>
               </div>
-            )}
-          </>
-        )}
-        {/* Repository Modal */}
-        {modalRepo && (
-          <RepoDetailsModal
-            item={modalRepo}
-            tab="github"
-            isOpen={!!modalRepo}
-            onClose={closeModal}
-          />
-        )}
+              <CardDescription className="text-sm">
+                {repo.description || 'No description available'}
+              </CardDescription>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
+                <span>{repo.owner?.login || <span className="italic">No owner</span>}</span>
+                {repo.owner?.avatar_url &&
+                  <img src={repo.owner.avatar_url} className="w-6 h-6 rounded-full ml-2" alt={repo.owner.login || "owner"} />}
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col gap-2 text-sm text-muted-foreground mb-2">
+                <div>
+                  <span className="font-medium mr-2">Full Name:</span>
+                  <span>{repo.full_name || "-"}</span>
+                </div>
+                <div>
+                  <span className="font-medium mr-2">Default Branch:</span>
+                  <span>{repo.default_branch || '-'}</span>
+                </div>
+                <div>
+                  <span className="font-medium mr-2">Language:</span>
+                  <span>{repo.language || 'Unknown'}</span>
+                </div>
+                <div>
+                  <span className="font-medium mr-2">Updated:</span>
+                  <span>{repo.updated_at ? new Date(repo.updated_at).toLocaleString() : '-'}</span>
+                </div>
+                <div>
+                  <span className="font-medium mr-2">Clone URL:</span>
+                  <span className="break-all">{repo.clone_url}</span>
+                </div>
+                <div className="flex gap-2 mt-2">
+                  {repo.html_url && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(repo.html_url, '_blank')}
+                      className="flex items-center gap-2"
+                    >
+                      <Github className="w-4 h-4" />
+                      GitHub
+                    </Button>
+                  )}
+                  {repo.clone_url && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCopy(repo.clone_url)}
+                      title="Copy Clone URL"
+                      className="flex items-center gap-1 border ml-0.5"
+                    >
+                      <Copy className="h-4 w-4" />
+                      <span className="pl-1">Copy</span>
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
     );
   }
 
-  // GitLab tab
+  // GitLab
   if (!gitlabConnected) {
     return (
       <Card>
@@ -204,80 +150,111 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       </Card>
     );
   }
-  return (
-    <div>
-      {/* Filter/Sort Controls */}
-      <div className="mb-4 flex flex-wrap gap-2">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-2 top-2.5 w-4 h-4 text-muted-foreground" />
-          <input
-            className="border rounded pl-8 pr-2 py-1 w-full text-sm"
-            placeholder="Search projects..."
-            value={search}
-            onChange={e => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-          />
-        </div>
-        <div>
-          <label className="text-xs text-muted-foreground mr-1">Sort</label>
-          <select
-            className="border rounded px-2 py-1 text-xs"
-            value={sorting}
-            onChange={e => setSorting(e.target.value as SortingOption)}
-          >
-            {SORT_OPTIONS.map(s => (
-              <option value={s.value} key={s.value}>{s.label}</option>
-            ))}
-          </select>
-        </div>
+  if (!gitlabProjects.length) {
+    return (
+      <div>
+        <p className="text-muted-foreground">No projects found</p>
       </div>
-      {/* List */}
-      {filteredGitlabProjects.length === 0 ? (
-        <div>
-          <p className="text-muted-foreground">No projects found{gitlabProjects.length ? " (filtered)" : ""}</p>
-        </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {paginatedGitlabProjects.map((project) => (
-              <div key={project.id} className="relative group">
-                <div
-                  role="button"
-                  tabIndex={0}
-                  className="cursor-pointer"
-                  onClick={() => setModalRepo(project)}
-                  onKeyDown={e => { if (e.key === "Enter") setModalRepo(project); }}
-                >
-                  <GitLabProjectCard project={project} />
-                </div>
+    );
+  }
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {gitlabProjects.map((project) => (
+        <Card key={project.id}>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Gitlab className="w-5 h-5 text-purple-600" />
+                {project.name}
+                {project.archived && <Badge variant="secondary" className="ml-2">Archived</Badge>}
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                {(project.visibility === 'private')
+                  ? <Badge variant="secondary">Private</Badge>
+                  : <Badge variant="outline">Public</Badge>}
               </div>
-            ))}
-          </div>
-          {/* Pagination Controls */}
-          {totalGitlabPages > 1 && (
-            <div className="flex justify-center gap-2 mt-4">
-              <Button size="sm" disabled={page === 1} onClick={() => setPage(page - 1)}>
-                Previous
-              </Button>
-              <span className="px-2 text-sm">{page} / {totalGitlabPages}</span>
-              <Button size="sm" disabled={page === totalGitlabPages} onClick={() => setPage(page + 1)}>
-                Next
-              </Button>
             </div>
-          )}
-        </>
-      )}
-      {/* Project Modal */}
-      {modalRepo && (
-        <RepoDetailsModal
-          item={modalRepo}
-          tab="gitlab"
-          isOpen={!!modalRepo}
-          onClose={closeModal}
-        />
-      )}
+            <CardDescription className="text-sm">
+              {project.description || 'No description available'}
+            </CardDescription>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
+              <span>{project.namespace?.name ?? <span className="italic">-</span>}</span>
+              {project.namespace?.avatar_url &&
+                <img src={project.namespace.avatar_url} className="w-6 h-6 rounded-full ml-2" alt={project.namespace.name || "namespace"} />}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col gap-2 text-sm text-muted-foreground mb-2">
+              <div>
+                <span className="font-medium mr-2">Path with Namespace:</span>
+                <span>{project.path_with_namespace || project.name_with_namespace || '-'}</span>
+              </div>
+              <div>
+                <span className="font-medium mr-2">Default Branch:</span>
+                <span>{project.default_branch || '-'}</span>
+              </div>
+              <div>
+                <span className="font-medium mr-2">Updated:</span>
+                <span>
+                  {project.updated_at
+                    ? new Date(project.updated_at).toLocaleString()
+                    : (project.last_activity_at
+                      ? new Date(project.last_activity_at).toLocaleString()
+                      : '-')}
+                </span>
+              </div>
+              <div>
+                <span className="font-medium mr-2">HTTP/S URL:</span>
+                <span className="break-all">{project.http_url_to_repo || '-'}</span>
+              </div>
+              <div>
+                <span className="font-medium mr-2">SSH URL:</span>
+                <span className="break-all">{project.ssh_url_to_repo || '-'}</span>
+              </div>
+              <div className="flex gap-2 mt-2">
+                {project.web_url && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(project.web_url, '_blank')}
+                    className="flex items-center gap-2"
+                  >
+                    <Gitlab className="w-4 h-4" />
+                    GitLab
+                  </Button>
+                )}
+                {project.http_url_to_repo && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleCopy(project.http_url_to_repo)}
+                    title="Copy HTTP Clone URL"
+                    className="flex items-center gap-1 border ml-0.5"
+                  >
+                    <Copy className="h-4 w-4" />
+                    <span className="pl-1">Copy</span>
+                  </Button>
+                )}
+                {project.ssh_url_to_repo && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleCopy(project.ssh_url_to_repo)}
+                    title="Copy SSH URL"
+                    className="flex items-center gap-1 border ml-0.5"
+                  >
+                    <Copy className="h-4 w-4" />
+                    <span className="pl-1">Copy</span>
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 };
+
+// This file is getting long; further splitting into subcomponents is recommended if changes continue.
+
