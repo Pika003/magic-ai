@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -174,72 +173,73 @@ export const ProfilePage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <Navigation />
-      <div className="pt-8 px-4 md:px-10 max-w-3xl mx-auto">
+      <div className="pt-10 px-4 md:px-10 max-w-6xl mx-auto">
         <div className="mb-8">
-          <h2 className="text-3xl font-bold text-slate-800 mb-1">Profile Settings</h2>
+          <h2 className="text-3xl font-bold text-slate-800 mb-2">Profile Settings</h2>
           <p className="text-slate-600">Manage your account, API settings, and integrations</p>
         </div>
-        {/* Profile row and usage bar side by side */}
-        <div className="flex flex-col md:flex-row gap-6 mb-8">
-          <Card className="flex-1 max-w-xl mx-auto md:mx-0">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <User className="w-5 h-5 text-blue-500" />
-                <span>Profile Information</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={updateProfile} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={user?.email || ''}
-                    disabled
-                    className="bg-slate-50"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="fullName">Full Name</Label>
-                  <Input
-                    id="fullName"
-                    type="text"
-                    placeholder="Enter your full name"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="username">Username</Label>
-                  <Input
-                    id="username"
-                    type="text"
-                    placeholder="Choose a username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                  />
-                </div>
-                <Button type="submit" disabled={saving} className="w-full">
-                  {saving ? (
-                    "Saving..."
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4 mr-2" />
-                      Save Profile
-                    </>
-                  )}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-          {/* Usage bar beside profile info */}
-          <div className="w-full md:w-80 flex flex-col justify-start">
+        {/* Main row: Profile info & Usage bar side by side */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
+          <div>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <User className="w-5 h-5 text-blue-500" />
+                  <span>Profile Information</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={updateProfile} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={user?.email || ''}
+                      disabled
+                      className="bg-slate-50"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="fullName">Full Name</Label>
+                    <Input
+                      id="fullName"
+                      type="text"
+                      placeholder="Enter your full name"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="username">Username</Label>
+                    <Input
+                      id="username"
+                      type="text"
+                      placeholder="Choose a username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                    />
+                  </div>
+                  <Button type="submit" disabled={saving} className="w-full">
+                    {saving ? (
+                      "Saving..."
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4 mr-2" />
+                        Save Profile
+                      </>
+                    )}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+          <div className="flex items-stretch">
             <UsageStatsCard />
           </div>
         </div>
-        {/* Remaining 2 cards, consistent grid/padding */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Remaining 2 cards in a row below, consistent grid/padding */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">

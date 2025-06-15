@@ -33,8 +33,8 @@ export const UsageStatsCard = () => {
   const usagePercentage = Math.min((totalUsage / 50) * 100, 100);
 
   return (
-    <div className="p-4 border rounded-lg bg-white w-full shadow mb-2 flex flex-col gap-2">
-      <div className="flex justify-between items-center mb-2">
+    <div className="p-6 border rounded-lg bg-white flex flex-col gap-3 h-full min-w-[250px]">
+      <div className="flex justify-between items-center">
         <span className="text-base font-medium text-slate-700">Total Usage</span>
         <span className={`text-sm font-bold ${totalUsage >= 50 ? 'text-red-600' : totalUsage >= 40 ? 'text-orange-600' : 'text-green-600'}`}>
           {loading ? '-' : `${totalUsage} / 50`}

@@ -3,14 +3,9 @@ import React from 'react';
 import { Navigation } from './Navigation';
 import { Sidebar } from './Sidebar';
 import { useAuth } from '@/contexts/AuthContext';
-import { useLocation } from 'react-router-dom';
 
 export const Layout = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
-  const location = useLocation();
-
-  // Apply extra top padding for Version Control page
-  const isVersionControl = location.pathname === '/version-control';
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -21,14 +16,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
             <Sidebar />
           </div>
         )}
-        <main
-          className={`
-            flex-1
-            ${isVersionControl ? 'pt-10' : 'pt-6'}
-            px-4 md:px-6
-            transition-all
-          `}
-        >
+        <main className="flex-1 pt-10 px-4 md:px-10">
           {children}
         </main>
       </div>
