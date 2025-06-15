@@ -7,7 +7,7 @@ import { usePaidStatus } from '@/contexts/PaidStatusContext';
 export const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isPaidUser } = usePaidStatus();
+  // const { isPaidUser } = usePaidStatus(); // Commented out for now as Version Control is accessible to all.
 
   const sections = [
     {
@@ -38,16 +38,14 @@ export const Sidebar = () => {
       description: 'Manage projects',
       path: '/projects'
     },
-    // Only add Version Control if paid
-    ...(isPaidUser ? [
-      {
-        id: 'version-control',
-        label: "Version Control",
-        icon: GitBranch,
-        description: "GitHub & GitLab tools",
-        path: '/version-control'
-      }
-    ] : [])
+    // Version Control is now visible for all users, not just paid users.
+    {
+      id: 'version-control',
+      label: "Version Control",
+      icon: GitBranch,
+      description: "GitHub & GitLab tools",
+      path: '/version-control'
+    }
   ];
 
   return (
