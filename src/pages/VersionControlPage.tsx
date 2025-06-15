@@ -96,15 +96,24 @@ export const VersionControlPage = () => {
           description: `Your ${provider} account has been connected.`,
         });
         
-        // Refresh connections and fetch data after successful connection
-        setTimeout(async () => {
-          await checkConnections();
-          if (provider === 'github') {
-            await fetchDataForTab('github');
-          } else if (provider === 'gitlab') {
-            await fetchDataForTab('gitlab');
-          }
-        }, 1000);
+        // Just refresh the connection status.
+        // The other useEffect will fetch data if needed.
+        const connectionTimer = setTimeout(() => {
+          checkConnections();
+        }, 500);
+        
+        // Cleanup function for the connection timer
+        const cleanup = () => clearTimeout(connectionTimer);
+        
+        // The navigation timer is separate
+        const navigateTimer = setTimeout(() => {
+          navigate(location.pathname, { replace: true });
+        }, 2000);
+
+        return () => {
+          cleanup();
+          clearTimeout(navigateTimer);
+        };
       } else if (status === 'error') {
         toast({
           title: `Failed to connect to ${provider}`,
@@ -113,15 +122,16 @@ export const VersionControlPage = () => {
         });
       }
       
+      // Fallback navigation cleanup for error case
       const timer = setTimeout(() => {
         navigate(location.pathname, { replace: true });
       }, 2000);
 
       return () => clearTimeout(timer);
     }
-  }, [location, navigate, checkConnections, fetchDataForTab]);
+  }, [location, navigate, checkConnections]);
 
-  // Fetch data when tab changes
+  // Fetch data when tab changes or connection status changes
   useEffect(() => {
     if (activeTab === 'github' && githubConnected && githubRepos.length === 0) {
       fetchDataForTab('github');

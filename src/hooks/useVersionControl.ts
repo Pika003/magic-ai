@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   fetchGitHubRepositories,
   fetchGitLabProjects,
@@ -19,7 +19,7 @@ export const useVersionControl = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Check connections without fetching data
-  const checkConnections = async () => {
+  const checkConnections = useCallback(async () => {
     try {
       const [githubStatus, gitlabStatus] = await Promise.all([
         checkConnectionStatus('github'),
@@ -31,9 +31,9 @@ export const useVersionControl = () => {
       console.error('Error checking connections:', err);
       setError('Failed to check platform connections.');
     }
-  };
+  }, []);
 
-  const fetchGitHubData = async () => {
+  const fetchGitHubData = useCallback(async () => {
     // First check if we're actually connected
     const isConnected = await checkConnectionStatus('github');
     setGithubConnected(isConnected);
@@ -72,9 +72,9 @@ export const useVersionControl = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const fetchGitLabData = async () => {
+  const fetchGitLabData = useCallback(async () => {
     // First check if we're actually connected
     const isConnected = await checkConnectionStatus('gitlab');
     setGitlabConnected(isConnected);
@@ -113,31 +113,36 @@ export const useVersionControl = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Used by page/tab to fetch only what is needed
-  const fetchDataForTab = async (tab: 'github' | 'gitlab') => {
+  const fetchDataForTab = useCallback(async (tab: 'github' | 'gitlab') => {
     if (tab === 'github') {
       await fetchGitHubData();
     } else {
       await fetchGitLabData();
     }
-  };
+  }, [fetchGitHubData, fetchGitLabData]);
 
   // Refresh both connections and data
-  const refreshData = async () => {
+  const refreshData = useCallback(async () => {
     setLoading(true);
     setError(null);
     
-    // First check connections
-    await checkConnections();
+    // First check connections and update state
+    const [ghStatus, glStatus] = await Promise.all([
+        checkConnectionStatus('github'),
+        checkConnectionStatus('gitlab')
+    ]);
+    setGithubConnected(ghStatus);
+    setGitlabConnected(glStatus);
     
-    // Then fetch data for connected services
+    // Then fetch data for newly confirmed connected services
     const promises = [];
-    if (githubConnected) {
+    if (ghStatus) {
       promises.push(fetchGitHubData());
     }
-    if (gitlabConnected) {
+    if (glStatus) {
       promises.push(fetchGitLabData());
     }
     
@@ -148,10 +153,10 @@ export const useVersionControl = () => {
       title: "Refreshed",
       description: "Repository data has been updated",
     });
-  };
+  }, [fetchGitHubData, fetchGitLabData]);
 
   // Disconnect a provider
-  const handleDisconnect = async (provider: 'github' | 'gitlab') => {
+  const handleDisconnect = useCallback(async (provider: 'github' | 'gitlab') => {
     try {
       await disconnectProvider(provider);
 
@@ -178,7 +183,7 @@ export const useVersionControl = () => {
         variant: "destructive",
       });
     }
-  };
+  }, [checkConnections]);
 
   // Initialize: only check connections, don't fetch data automatically
   useEffect(() => {
@@ -187,7 +192,7 @@ export const useVersionControl = () => {
       await checkConnections();
       setLoading(false);
     })();
-  }, []);
+  }, [checkConnections]);
 
   return {
     githubRepos,
