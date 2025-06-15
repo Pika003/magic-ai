@@ -7,9 +7,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useUsageTracking } from '@/hooks/useUsageTracking';
+-import { useUsageTracking } from '@/hooks/useUsageTracking';
++import { usePaidStatus } from '@/contexts/PaidStatusContext';
 
-// ONLY ONE TIME $5 PAYMENT, NO PLANS
 const PLAN = {
   name: "Lifetime Unlimited",
   price: 5.00,
@@ -27,7 +27,8 @@ export const PaymentPage = () => {
   const [verifying, setVerifying] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { refreshPaidStatus, isPaidUser, loading: usageLoading } = useUsageTracking();
+-  const { refreshPaidStatus, isPaidUser, loading: usageLoading } = useUsageTracking();
++  const { refreshPaidStatus, isPaidUser, loading: statusLoading } = usePaidStatus();
 
   // On mount: check if payment=success and refresh paid status
   useEffect(() => {
@@ -53,7 +54,8 @@ export const PaymentPage = () => {
       });
     }
   // Only run this check once on mount and when location changes
-  }, [location.search]);
+-  }, [location.search]);
++  }, [location.search, refreshPaidStatus, isPaidUser, navigate]);
 
   const handleStripePayment = async () => {
     if (!user) return;
@@ -90,8 +92,9 @@ export const PaymentPage = () => {
     }
   };
 
-  // If payment was done, show success and redirect
-  if (verifying || (location.search.includes("payment=success") && usageLoading)) {
+-  // If payment was done, show success and redirect
+-  if (verifying || (location.search.includes("payment=success") && usageLoading)) {
++  if (verifying || (location.search.includes("payment=success") && statusLoading)) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
         <div className="bg-white border shadow px-10 py-8 rounded flex flex-col items-center">
@@ -155,4 +158,3 @@ export const PaymentPage = () => {
 };
 
 export default PaymentPage;
-

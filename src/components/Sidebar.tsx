@@ -3,12 +3,14 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, Users, Calendar, Briefcase, GitBranch } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useUsageTracking } from '@/hooks/useUsageTracking';
+-import { useUsageTracking } from '@/hooks/useUsageTracking';
++import { usePaidStatus } from '@/contexts/PaidStatusContext';
 
 export const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isPaidUser } = useUsageTracking();
+-  const { isPaidUser } = useUsageTracking();
++  const { isPaidUser } = usePaidStatus();
 
   const sections = [
     {
