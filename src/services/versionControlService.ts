@@ -63,11 +63,19 @@ export const fetchGitHubRepositories = async (): Promise<GitHubRepository[]> => 
       },
       body: { kind: 'repos' }
     });
-    if (response.error || !Array.isArray(response.data)) {
-      console.error("GitHub API error or non-array data:", response.error, response.data);
+    // Edge Function returns plain array as response (not { data } wrapped)
+    let repos: GitHubRepository[] = [];
+    if (Array.isArray(response)) {
+      repos = response as GitHubRepository[];
+    } else if (Array.isArray((response as any)?.data)) {
+      repos = (response as any).data;
+    } else if (Array.isArray((response as any)?.data?.data)) {
+      repos = (response as any).data.data;
+    } else {
+      console.error("GitHub API error or non-array data:", response);
       return [];
     }
-    return response.data;
+    return repos;
   } catch (error) {
     console.error("Error fetching GitHub repositories:", error);
     return [];
@@ -84,11 +92,19 @@ export const fetchGitLabProjects = async (): Promise<GitLabProject[]> => {
       },
       body: { kind: 'projects' }
     });
-    if (response.error || !Array.isArray(response.data)) {
-      console.error("GitLab API error or non-array data:", response.error, response.data);
+    // Edge Function returns plain array as response (not { data } wrapped)
+    let projects: GitLabProject[] = [];
+    if (Array.isArray(response)) {
+      projects = response as GitLabProject[];
+    } else if (Array.isArray((response as any)?.data)) {
+      projects = (response as any).data;
+    } else if (Array.isArray((response as any)?.data?.data)) {
+      projects = (response as any).data.data;
+    } else {
+      console.error("GitLab API error or non-array data:", response);
       return [];
     }
-    return response.data;
+    return projects;
   } catch (error) {
     console.error("Error fetching GitLab projects:", error);
     return [];
