@@ -1,11 +1,14 @@
-
 import React from 'react';
 import { Progress } from '@/components/ui/progress';
 import { useUsageTracking } from '@/hooks/useUsageTracking';
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 export const UsageStatsCard = () => {
-  const { totalUsage, loading, isPaidUser, resetDate } = useUsageTracking();
+  const { totalUsage, loading, isPaidUser, resetDate, fetchTotalUsage } = useUsageTracking();
+  const navigate = useNavigate();
 
+  // If paid, always show unlimited
   if (isPaidUser) {
     return (
       <div className="p-6 border rounded-lg bg-white flex flex-col justify-center gap-4 h-full w-full">
@@ -13,6 +16,13 @@ export const UsageStatsCard = () => {
           <h3 className="text-lg font-semibold text-slate-700 mb-2">Usage Statistics</h3>
           <p className="text-green-600 font-bold text-lg mb-2">Unlimited Usage</p>
           <div className="text-md text-slate-500">Thank you for upgrading. Enjoy unlimited features forever!</div>
+          <Button
+            variant="secondary"
+            className="mt-4"
+            onClick={fetchTotalUsage}
+          >
+            Refresh Status
+          </Button>
         </div>
       </div>
     );

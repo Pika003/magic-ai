@@ -105,6 +105,12 @@ export const useUsageTracking = () => {
     }
   };
 
+  // After upgrade, this fetch will reload paid_user state.
+  const refreshPaidStatus = async () => {
+    await fetchUserStatus();
+    await fetchTotalUsage();
+  };
+
   useEffect(() => {
     fetchTotalUsage();
   }, [user]);
@@ -116,6 +122,7 @@ export const useUsageTracking = () => {
     fetchTotalUsage,
     hasReachedLimit: !isPaidUser && totalUsage >= 50,
     isPaidUser,
-    resetDate
+    resetDate,
+    refreshPaidStatus // Add this so consumers can force refresh after payment.
   };
 };

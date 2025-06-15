@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { useUsageTracking } from '@/hooks/useUsageTracking';
 
 // ONLY ONE TIME $5 PAYMENT, NO PLANS
 const PLAN = {
@@ -24,6 +24,7 @@ export const PaymentPage = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { refreshPaidStatus } = useUsageTracking();
 
   const handleStripePayment = async () => {
     if (!user) return;
@@ -41,6 +42,7 @@ export const PaymentPage = () => {
       if (error) throw error;
       if (data?.url) {
         window.open(data.url, '_blank');
+        setTimeout(refreshPaidStatus, 6000); // Try refreshing paid status 6s after opening Stripe.
       } else {
         toast({
           title: "Payment Error",
