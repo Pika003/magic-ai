@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,6 +13,7 @@ import { ClientUpdate } from "./components/ClientUpdate";
 import { TodaysUpdate } from "./components/TodaysUpdate";
 import NotFound from "./pages/NotFound";
 import { ProjectsPage } from "./pages/ProjectsPage";
+import VersionControlPage from "./pages/VersionControlPage";
 
 const queryClient = new QueryClient();
 
@@ -64,6 +64,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <ProjectsPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/version-control"
+              element={
+                <ProtectedRoute>
+                  <VersionControlPage />
                 </ProtectedRoute>
               } 
             />

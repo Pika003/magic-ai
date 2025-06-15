@@ -1,7 +1,6 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Users, Calendar, Briefcase } from 'lucide-react';
+import { CheckCircle, Users, Calendar, Briefcase, GitBranch } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 export const Sidebar = () => {
@@ -36,6 +35,13 @@ export const Sidebar = () => {
       icon: Briefcase,
       description: 'Manage projects',
       path: '/projects'
+    },
+    {
+      id: 'version-control',
+      label: "Version Control",
+      icon: GitBranch,
+      description: "GitHub & GitLab tools",
+      path: '/version-control'
     }
   ];
 
