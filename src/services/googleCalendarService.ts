@@ -109,6 +109,63 @@ export const authenticateGoogleCalendar = async (userId: string): Promise<{ succ
   });
 };
 
+/**
+ * Fetches the next 2-3 upcoming Google Calendar events (starting from now)
+ */
+export const getUpcomingEvents = async (userId: string, limit = 3): Promise<CalendarEvent[]> => {
+  try {
+    // Get stored tokens
+    const { data: tokenData, error: tokenError } = await supabase
+      .from('user_google_tokens')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (tokenError || !tokenData) {
+      console.error('No Google tokens found');
+      return [];
+    }
+
+    // Check if token is expired
+    const now = new Date();
+    const expiresAt = new Date(tokenData.expires_at);
+    
+    if (now >= expiresAt) {
+      console.log('Token expired, need to re-authenticate');
+      return [];
+    }
+
+    // Set the access token for gapi client
+    window.gapi.client.setToken({
+      access_token: tokenData.access_token
+    });
+
+    // TimeMin is now; fetch upcoming
+    const response = await window.gapi.client.calendar.events.list({
+      calendarId: 'primary',
+      timeMin: now.toISOString(),
+      maxResults: limit,
+      showDeleted: false,
+      singleEvents: true,
+      orderBy: 'startTime'
+    });
+
+    const events: CalendarEvent[] = response.result.items?.map((event: any) => ({
+      id: event.id,
+      title: event.summary || 'No title',
+      start: event.start?.dateTime || event.start?.date || '',
+      end: event.end?.dateTime || event.end?.date || '',
+      description: event.description || '',
+      location: event.location || ''
+    })) || [];
+
+    return events;
+  } catch (error) {
+    console.error('Error fetching calendar events:', error);
+    return [];
+  }
+};
+
 export const getTodaysEvents = async (userId: string): Promise<CalendarEvent[]> => {
   try {
     // Get stored tokens
