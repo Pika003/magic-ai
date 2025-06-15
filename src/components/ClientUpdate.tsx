@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -30,6 +29,7 @@ export const ClientUpdate = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [clientUpdates, setClientUpdates] = useState<ClientUpdate[]>([]);
   const [yourName, setYourName] = useState('Your Name'); // Default placeholder
+  const [recipientEmail, setRecipientEmail] = useState('');
 
   // Fetch your name (full_name from profile)
   useEffect(() => {
@@ -123,6 +123,15 @@ export const ClientUpdate = () => {
       title: "Copied!",
       description: "Update copied to clipboard.",
     });
+  };
+
+  // For the mailto link, encode as needed
+  const getMailToLink = () => {
+    if (!formattedUpdate) return '#';
+    const subject = encodeURIComponent(`Client Update for ${clientName || "Project"}`);
+    const body = encodeURIComponent(formattedUpdate);
+    const to = recipientEmail ? encodeURIComponent(recipientEmail) : '';
+    return `mailto:${to}?subject=${subject}&body=${body}`;
   };
 
   return (
@@ -225,30 +234,58 @@ export const ClientUpdate = () => {
 
             {formattedUpdate && (
               <div className="space-y-3">
-                <div className="flex space-x-2">
-                  <Button
-                    onClick={sendUpdate}
-                    className="flex-1 bg-green-500 hover:bg-green-600"
-                  >
-                    <Send className="w-4 h-4 mr-2" />
-                    Save Update
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => copyToClipboard(formattedUpdate)}
-                  >
-                    <Copy className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleSendEmail}
-                    className="text-blue-600"
-                  >
-                    <Mail className="w-4 h-4" />
-                    Email Send
-                  </Button>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      onClick={sendUpdate}
+                      className="flex-1 bg-green-500 hover:bg-green-600"
+                    >
+                      <Send className="w-4 h-4 mr-2" />
+                      Save Update
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copyToClipboard(formattedUpdate)}
+                    >
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  {/* Recipient email input */}
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      type="email"
+                      placeholder="Recipient Email (optional)"
+                      value={recipientEmail}
+                      onChange={e => setRecipientEmail(e.target.value)}
+                      className="flex-1 border-slate-200 focus:border-blue-500"
+                    />
+                    <a
+                      href={getMailToLink()}
+                      onClick={e => {
+                        if (!formattedUpdate) {
+                          e.preventDefault();
+                          toast({
+                            title: "Error",
+                            description: "No client update to send.",
+                            variant: "destructive"
+                          });
+                        }
+                      }}
+                      className="flex-none"
+                    >
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="text-blue-600"
+                      >
+                        <Mail className="w-4 h-4" />
+                        Email Send
+                      </Button>
+                    </a>
+                  </div>
                 </div>
               </div>
             )}
@@ -320,4 +357,3 @@ export const ClientUpdate = () => {
     </Layout>
   );
 };
-
