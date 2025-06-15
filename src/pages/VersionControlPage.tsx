@@ -73,12 +73,15 @@ const handleOAuthStart = async (provider: 'github' | 'gitlab') => {
       })
     });
     const data = await res.json();
+
     if (data.url) {
-      // Manually append supabaseToken
+      // Always append supabaseToken
       const urlWithToken = data.url.includes('?')
         ? `${data.url}&supabaseToken=${encodeURIComponent(session.access_token)}`
         : `${data.url}?supabaseToken=${encodeURIComponent(session.access_token)}`;
-      window.open(urlWithToken, "_blank", "noopener,noreferrer");
+
+      // Redirect in same tab (critical for OAuth to finish in-app):
+      window.location.href = urlWithToken;
     } else {
       let description = "Failed to get OAuth URL. Please try again.";
       if (data.error) {
