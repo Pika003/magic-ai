@@ -11,7 +11,8 @@ const corsHeaders = {
 
 const GITHUB_CLIENT_ID = Deno.env.get("GITHUB_CLIENT_ID");
 const GITHUB_CLIENT_SECRET = Deno.env.get("GITHUB_CLIENT_SECRET");
-const APP_URL = Deno.env.get("APP_URL") || "https://wrvobkcgxmemexernxne.supabase.co"; // Replace with your deployed frontend
+const APP_URL = Deno.env.get("APP_URL") || "https://wrvobkcgxmemexernxne.supabase.co";
+const FRONTEND_URL = "https://preview--sentence-scribe-ai-magic.lovable.app";
 
 serve(async (req: Request) => {
   // Handle CORS preflight requests
@@ -33,11 +34,13 @@ serve(async (req: Request) => {
   }
 
   // 2. Step: Callback: GitHub redirects here with ?code=...
-  if (action === "callback" && req.method === "POST") {
+  if (action === "callback") {
     try {
-      const { code } = await req.json();
-      if (!code)
-        return new Response(JSON.stringify({ error: "Missing code" }), { status: 400, headers: corsHeaders });
+      const code = url.searchParams.get('code');
+      if (!code) {
+        const redirect = new URL('/version-control?provider=github&status=error&message=Missing_authorization_code', FRONTEND_URL);
+        return Response.redirect(redirect.href, 302);
+      }
 
       // Exchange code for access token
       const tokenResp = await fetch("https://github.com/login/oauth/access_token", {
@@ -54,19 +57,19 @@ serve(async (req: Request) => {
         }),
       });
       const tokenData = await tokenResp.json();
-      // tokenData.access_token, tokenData.token_type, tokenData.scope
 
       if (tokenData.error) {
-        return new Response(JSON.stringify(tokenData), { status: 400, headers: corsHeaders });
+        const message = encodeURIComponent(tokenData.error_description || tokenData.error);
+        const redirect = new URL(`/version-control?provider=github&status=error&message=${message}`, FRONTEND_URL);
+        return Response.redirect(redirect.href, 302);
       }
+      
+      const redirect = new URL('/version-control?provider=github&status=success', FRONTEND_URL);
+      return Response.redirect(redirect.href, 302);
 
-      // You could store this token in Supabase here by user id
-      // Demo just returns token for now
-      return new Response(JSON.stringify({ access_token: tokenData.access_token }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
     } catch (e) {
-      return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: corsHeaders });
+      const redirect = new URL(`/version-control?provider=github&status=error&message=${encodeURIComponent(e.message)}`, FRONTEND_URL);
+      return Response.redirect(redirect.href, 302);
     }
   }
 

@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Card,
@@ -19,6 +20,7 @@ import {
   Plus,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const GITHUB_SECTIONS = [
   { label: "Repositories", icon: Github, desc: "Manage your GitHub repositories" },
@@ -37,7 +39,19 @@ const GITLAB_SECTIONS = [
 ];
 
 const handleOAuthStart = async (provider: 'github' | 'gitlab') => {
-  // Fixed OAuth endpoints - removed extra path segments
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (!session) {
+    toast({
+      title: "Not Authenticated",
+      description: "You need to be signed in to connect your account.",
+      variant: "destructive",
+    });
+    return;
+  }
+  
+  const anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indydm9ia2NneG1lbWV4ZXJueG5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk4NzQ3OTYsImV4cCI6MjA2NTQ1MDc5Nn0.6GeVPRT-hzf5uliidVKHppOHuKrmPSFrHNK8k6hibeg";
+
   let endpoint = '';
   if (provider === 'github') {
     endpoint = 'https://wrvobkcgxmemexernxne.supabase.co/functions/v1/github-oauth/start';
@@ -46,7 +60,13 @@ const handleOAuthStart = async (provider: 'github' | 'gitlab') => {
   }
   
   try {
-    const res = await fetch(endpoint, { method: "GET" });
+    const res = await fetch(endpoint, {
+      method: "GET",
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': anonKey,
+      },
+    });
     const data = await res.json();
     if (data.url) {
       window.location.href = data.url;
@@ -76,6 +96,32 @@ export const VersionControlPage = () => {
   const [commitMessage, setCommitMessage] = useState("");
   const [repositories, setRepositories] = useState<string[]>([]);
   const [branches, setBranches] = useState<string[]>([]);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const status = params.get('status');
+    const provider = params.get('provider');
+    const message = params.get('message');
+
+    if (status) {
+      if (status === 'success') {
+        toast({
+          title: `Successfully connected to ${provider}`,
+          description: `Your ${provider} account has been connected.`,
+        });
+      } else if (status === 'error') {
+        toast({
+          title: `Failed to connect to ${provider}`,
+          description: message || 'An unknown error occurred.',
+          variant: 'destructive',
+        });
+      }
+      // Clean up URL
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location, navigate]);
 
   // Mock data for demonstration
   useEffect(() => {
