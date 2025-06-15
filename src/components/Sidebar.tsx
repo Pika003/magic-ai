@@ -40,18 +40,8 @@ export const Sidebar = () => {
   ];
 
   return (
-    <div className="fixed left-0 top-0 h-full w-64 bg-white border-r border-slate-200 shadow-sm z-40">
+    <div className="fixed left-0 top-0 h-full w-64 bg-white border-r border-slate-200 shadow-sm z-40 pt-16">
       <div className="p-6">
-        <div 
-          className="flex items-center space-x-3 cursor-pointer mb-8"
-          onClick={() => navigate('/')}
-        >
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-            <CheckCircle className="w-6 h-6 text-white" />
-          </div>
-          <h1 className="text-xl font-bold text-slate-800">SentenceAI</h1>
-        </div>
-        
         <nav className="space-y-2">
           {sections.map((section) => {
             const Icon = section.icon;
