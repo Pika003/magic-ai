@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, User, LogOut } from 'lucide-react';
@@ -5,7 +6,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 import { NotificationBell } from './NotificationBell';
-import { useUsageTracking } from '@/hooks/use-usage-tracking';
+// Corrected import path to match actual file name (camelCase):
+import { useUsageTracking } from '@/hooks/useUsageTracking';
 
 export const Navigation = () => {
   const { user, signOut } = useAuth();
