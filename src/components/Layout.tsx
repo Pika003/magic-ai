@@ -12,7 +12,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
       <Navigation />
       <div className="flex pt-0">
         {user && (
-          <div className="w-64 shrink-0">
+          <div>
             <Sidebar />
           </div>
         )}
