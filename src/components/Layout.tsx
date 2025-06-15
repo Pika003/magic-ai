@@ -16,7 +16,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
             <Sidebar />
           </div>
         )}
-        <main className="flex-1 p-8">
+        <main className="flex-1">
           {children}
         </main>
       </div>
