@@ -1,66 +1,106 @@
 
 import { useState, useEffect } from 'react';
-import { 
-  fetchGitHubRepositories, 
-  fetchGitLabProjects, 
+import {
+  fetchGitHubRepositories,
+  fetchGitLabProjects,
   checkConnectionStatus,
-  Repository,
-  GitLabProject 
+  GitHubRepository,
+  GitLabProject
 } from '@/services/versionControlService';
 import { toast } from '@/hooks/use-toast';
 
+// Narrow and independent state management per platform
 export const useVersionControl = () => {
-  const [githubRepos, setGithubRepos] = useState<Repository[]>([]);
+  const [githubRepos, setGithubRepos] = useState<GitHubRepository[]>([]);
   const [gitlabProjects, setGitlabProjects] = useState<GitLabProject[]>([]);
   const [githubConnected, setGithubConnected] = useState(false);
   const [gitlabConnected, setGitlabConnected] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
+  // Re-check connections, but fetch only on demand
   const checkConnections = async () => {
-    const [githubStatus, gitlabStatus] = await Promise.all([
-      checkConnectionStatus('github'),
-      checkConnectionStatus('gitlab')
-    ]);
-    
-    setGithubConnected(githubStatus);
-    setGitlabConnected(gitlabStatus);
+    try {
+      const [githubStatus, gitlabStatus] = await Promise.all([
+        checkConnectionStatus('github'),
+        checkConnectionStatus('gitlab')
+      ]);
+      setGithubConnected(githubStatus);
+      setGitlabConnected(gitlabStatus);
+    } catch (err) {
+      setError('Failed to check platform connection.');
+    }
   };
 
-  const fetchData = async () => {
+  const fetchGitHubData = async () => {
     setLoading(true);
-    
+    setError(null);
     try {
-      await checkConnections();
-      
-      const [repos, projects] = await Promise.all([
-        fetchGitHubRepositories(),
-        fetchGitLabProjects()
-      ]);
-      
-      setGithubRepos(repos);
-      setGitlabProjects(projects);
-    } catch (error) {
-      console.error('Error fetching version control data:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch repository data",
-        variant: "destructive"
-      });
+      const status = await checkConnectionStatus('github');
+      setGithubConnected(status);
+      if (status) {
+        const data = await fetchGitHubRepositories();
+        setGithubRepos(data);
+      } else {
+        setGithubRepos([]);
+      }
+    } catch (e) {
+      setError("Failed to fetch GitHub repositories.");
+      setGithubRepos([]);
     } finally {
       setLoading(false);
     }
   };
 
+  const fetchGitLabData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const status = await checkConnectionStatus('gitlab');
+      setGitlabConnected(status);
+      if (status) {
+        const data = await fetchGitLabProjects();
+        setGitlabProjects(data);
+      } else {
+        setGitlabProjects([]);
+      }
+    } catch (e) {
+      setError("Failed to fetch GitLab projects.");
+      setGitlabProjects([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Used by page/tab to fetch only what is needed
+  const fetchDataForTab = async (tab: 'github' | 'gitlab') => {
+    if (tab === 'github') {
+      await fetchGitHubData();
+    } else {
+      await fetchGitLabData();
+    }
+  };
+
+  // Expose single refresh that reloads both (used by Refresh)
   const refreshData = async () => {
-    await fetchData();
+    setLoading(true);
+    setError(null);
+    await checkConnections();
+    await Promise.all([fetchGitHubData(), fetchGitLabData()]);
+    setLoading(false);
     toast({
       title: "Refreshed",
       description: "Repository data has been updated",
     });
   };
 
+  // By default: initialize both
   useEffect(() => {
-    fetchData();
+    (async () => {
+      await checkConnections();
+      await Promise.all([fetchGitHubData(), fetchGitLabData()]);
+      setLoading(false);
+    })();
   }, []);
 
   return {
@@ -69,7 +109,9 @@ export const useVersionControl = () => {
     githubConnected,
     gitlabConnected,
     loading,
+    error,
     refreshData,
-    checkConnections
+    fetchDataForTab,
+    checkConnections,
   };
 };
