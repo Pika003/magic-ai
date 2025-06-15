@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { BarChart3, Zap, AlertTriangle } from 'lucide-react';
+import { BarChart3, Zap, AlertTriangle, TrendingUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -59,10 +59,10 @@ export const UsageStatsCard = () => {
 
   if (loading) {
     return (
-      <Card>
+      <Card className="h-fit">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
-            <BarChart3 className="w-5 h-5 text-purple-500" />
+            <TrendingUp className="w-5 h-5 text-purple-500" />
             <span>Usage Statistics</span>
           </CardTitle>
         </CardHeader>
@@ -74,58 +74,66 @@ export const UsageStatsCard = () => {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <BarChart3 className="w-5 h-5 text-purple-500" />
+    <Card className="h-fit">
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center space-x-2 text-lg">
+          <TrendingUp className="w-5 h-5 text-purple-500" />
           <span>Usage Statistics</span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <span className="text-sm font-medium">Total Usage</span>
-            <span className={`text-sm font-bold ${hasReachedLimit ? 'text-red-600' : isNearLimit ? 'text-orange-600' : 'text-green-600'}`}>
+            <span className="text-sm font-medium text-slate-700">Total Usage</span>
+            <span className={`text-lg font-bold ${hasReachedLimit ? 'text-red-600' : isNearLimit ? 'text-orange-600' : 'text-green-600'}`}>
               {totalUsage} / 50
             </span>
           </div>
           
           <Progress 
             value={usagePercentage} 
-            className={`h-3 ${hasReachedLimit ? 'bg-red-100' : isNearLimit ? 'bg-orange-100' : 'bg-green-100'}`}
+            className="h-2"
           />
           
           {hasReachedLimit && (
-            <div className="flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <AlertTriangle className="w-4 h-4 text-red-500" />
-              <span className="text-sm text-red-700">Usage limit reached! Please upgrade to continue.</span>
+            <div className="flex items-start space-x-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-red-800">Usage limit reached!</p>
+                <p className="text-sm text-red-600">Please upgrade to continue using features.</p>
+              </div>
             </div>
           )}
           
           {isNearLimit && !hasReachedLimit && (
-            <div className="flex items-center space-x-2 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-              <AlertTriangle className="w-4 h-4 text-orange-500" />
-              <span className="text-sm text-orange-700">You're approaching your usage limit.</span>
+            <div className="flex items-start space-x-3 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+              <AlertTriangle className="w-5 h-5 text-orange-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-orange-800">Approaching limit</p>
+                <p className="text-sm text-orange-600">You're close to your usage limit.</p>
+              </div>
             </div>
           )}
         </div>
 
         {featureBreakdown.length > 0 && (
           <div className="space-y-3">
-            <h4 className="font-medium text-slate-700">Feature Breakdown</h4>
-            {featureBreakdown.map((feature) => (
-              <div key={feature.feature_name} className="flex justify-between items-center py-2 border-b border-slate-100 last:border-b-0">
-                <span className="text-sm capitalize">{feature.feature_name.replace(/-/g, ' ')}</span>
-                <span className="text-sm font-medium text-slate-600">{feature.usage_count} uses</span>
-              </div>
-            ))}
+            <h4 className="font-medium text-slate-700 text-sm">Feature Breakdown</h4>
+            <div className="space-y-2">
+              {featureBreakdown.slice(0, 5).map((feature) => (
+                <div key={feature.feature_name} className="flex justify-between items-center py-2 px-3 bg-slate-50 rounded-lg">
+                  <span className="text-sm text-slate-700 capitalize">{feature.feature_name.replace(/-/g, ' ')}</span>
+                  <span className="text-sm font-medium text-slate-900">{feature.usage_count}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
         {(hasReachedLimit || isNearLimit) && (
           <Button 
             onClick={() => navigate('/payment')}
-            className="w-full bg-purple-500 hover:bg-purple-600"
+            className="w-full bg-purple-500 hover:bg-purple-600 text-white"
           >
             <Zap className="w-4 h-4 mr-2" />
             Upgrade Plan
