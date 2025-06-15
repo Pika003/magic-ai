@@ -92,7 +92,16 @@ export const ProjectForm = ({
   }, [project, form]);
 
   const handleSubmit = (data: ProjectFormData) => {
-    onSubmit(data);
+    // Ensure required fields are present and properly typed
+    const submitData: CreateProjectData & { status?: Project['status'] } = {
+      name: data.name!,
+      description: data.description,
+      client_name: data.client_name,
+      client_email: data.client_email,
+      update_frequency_days: data.update_frequency_days!,
+      ...(isEditing && data.status && { status: data.status })
+    };
+    onSubmit(submitData);
   };
 
   return (

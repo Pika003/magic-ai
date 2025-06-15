@@ -11,7 +11,7 @@ export const getProjects = async (userId: string): Promise<Project[]> => {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    return (data || []) as Project[];
   } catch (error) {
     console.error('Error fetching projects:', error);
     return [];
@@ -33,7 +33,7 @@ export const createProject = async (
       .single();
 
     if (error) throw error;
-    return { success: true, data };
+    return { success: true, data: data as Project };
   } catch (error: any) {
     console.error('Error creating project:', error);
     return { success: false, error: error.message };
@@ -56,7 +56,7 @@ export const updateProject = async (
       .single();
 
     if (error) throw error;
-    return { success: true, data };
+    return { success: true, data: data as Project };
   } catch (error: any) {
     console.error('Error updating project:', error);
     return { success: false, error: error.message };
