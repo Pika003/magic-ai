@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -110,8 +109,12 @@ export const VersionControlPage = () => {
       if (status === 'success') {
         toast({
           title: `Successfully connected to ${provider}`,
-          description: `Your ${provider} account has been connected.`,
+          description: `Your ${provider} account has been connected. Redirecting to pricing...`,
         });
+        // Redirect to pricing (payment) page after a brief delay
+        setTimeout(() => {
+          navigate('/payment', { replace: true });
+        }, 1600);
       } else if (status === 'error') {
         toast({
           title: `Failed to connect to ${provider}`,
@@ -124,10 +127,21 @@ export const VersionControlPage = () => {
     }
   }, [location, navigate]);
 
-  // Mock data for demonstration
+  // ⚠️ NOTE: The repository/branch lists are populated with mock data for demo only!
+  // To fetch actual GitHub/GitLab repos, you'd need to store the access_token from OAuth,
+  // call their APIs with it, and update state with the fetched repo list.
   useEffect(() => {
-    setRepositories(["my-awesome-project", "frontend-app", "backend-api"]);
-    setBranches(["main", "develop", "feature/auth", "hotfix/bug-123"]);
+    setRepositories([
+      "my-awesome-project",
+      "frontend-app",
+      "backend-api",
+    ]);
+    setBranches([
+      "main",
+      "develop",
+      "feature/auth",
+      "hotfix/bug-123",
+    ]);
   }, []);
 
   const handleAddRepository = () => {
