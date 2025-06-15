@@ -226,3 +226,56 @@ Updates: ${text}${liveLink ? `\nLive Link: ${liveLink}` : ''}
     throw error;
   }
 };
+
+/**
+ * Generate a professional Git commit message from input
+ */
+export const generateCommitMessageWithAI = async (
+  commitSummary: string,
+  isRefresh: boolean = false
+): Promise<string> => {
+  const API_KEY = await getOpenAIKey();
+
+  try {
+    const styleVariations = [
+      "Write a concise, clear, and highly professional Git commit message for the provided summary. Correct any grammar or language issues and make it suitable for a public repository. Use the conventional commit style if appropriate.",
+      "Transform the following project update or code description into a best-practice Git commit message. Make it descriptive, but not too verbose. Use correct tense (imperative), good language, and keep it professional."
+    ];
+    const selectedStyle = isRefresh
+      ? styleVariations[Math.floor(Math.random() * styleVariations.length)]
+      : styleVariations[0];
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: selectedStyle
+          },
+          {
+            role: 'user',
+            content: `Summary:\n${commitSummary}`
+          }
+        ],
+        temperature: isRefresh ? 0.5 : 0.3,
+        max_tokens: 100
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content.trim();
+  } catch (error) {
+    console.error('OpenAI API error:', error);
+    throw error;
+  }
+};
