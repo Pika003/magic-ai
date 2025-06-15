@@ -21,9 +21,15 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   gitlabConnected,
   activeTab
 }) => {
+  console.log('RepositoryList props:', { githubRepos, gitlabProjects, githubConnected, gitlabConnected, activeTab });
+  
   const openRepository = (url: string) => {
     window.open(url, '_blank');
   };
+
+  // Ensure we have arrays to work with
+  const safeGithubRepos = Array.isArray(githubRepos) ? githubRepos : [];
+  const safeGitlabProjects = Array.isArray(gitlabProjects) ? gitlabProjects : [];
 
   if (activeTab === 'github') {
     if (!githubConnected) {
@@ -39,7 +45,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       );
     }
 
-    if (githubRepos.length === 0) {
+    if (safeGithubRepos.length === 0) {
       return (
         <Card>
           <CardContent className="pt-6">
@@ -54,7 +60,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {githubRepos.map((repo) => (
+        {safeGithubRepos.map((repo) => (
           <Card key={repo.id} className="hover:shadow-md transition-shadow">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -117,7 +123,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     );
   }
 
-  if (gitlabProjects.length === 0) {
+  if (safeGitlabProjects.length === 0) {
     return (
       <Card>
         <CardContent className="pt-6">
@@ -132,7 +138,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {gitlabProjects.map((project) => (
+      {safeGitlabProjects.map((project) => (
         <Card key={project.id} className="hover:shadow-md transition-shadow">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">

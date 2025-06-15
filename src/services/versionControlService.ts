@@ -27,8 +27,12 @@ export interface GitLabProject {
 export const fetchGitHubRepositories = async (): Promise<Repository[]> => {
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw new Error("Not authenticated");
+    if (!session) {
+      console.log("No session found");
+      return [];
+    }
 
+    console.log("Fetching GitHub repositories...");
     const response = await supabase.functions.invoke('github-data', {
       headers: {
         Authorization: `Bearer ${session.access_token}`,
@@ -36,12 +40,21 @@ export const fetchGitHubRepositories = async (): Promise<Repository[]> => {
       body: { kind: 'repos' }
     });
 
+    console.log("GitHub API response:", response);
+
     if (response.error) {
       console.error("GitHub API error:", response.error);
       return [];
     }
 
-    return response.data || [];
+    // Ensure we return an array
+    const data = response.data;
+    if (!Array.isArray(data)) {
+      console.warn("GitHub API returned non-array data:", data);
+      return [];
+    }
+
+    return data;
   } catch (error) {
     console.error("Error fetching GitHub repositories:", error);
     return [];
@@ -51,8 +64,12 @@ export const fetchGitHubRepositories = async (): Promise<Repository[]> => {
 export const fetchGitLabProjects = async (): Promise<GitLabProject[]> => {
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw new Error("Not authenticated");
+    if (!session) {
+      console.log("No session found");
+      return [];
+    }
 
+    console.log("Fetching GitLab projects...");
     const response = await supabase.functions.invoke('gitlab-data', {
       headers: {
         Authorization: `Bearer ${session.access_token}`,
@@ -60,12 +77,21 @@ export const fetchGitLabProjects = async (): Promise<GitLabProject[]> => {
       body: { kind: 'projects' }
     });
 
+    console.log("GitLab API response:", response);
+
     if (response.error) {
       console.error("GitLab API error:", response.error);
       return [];
     }
 
-    return response.data || [];
+    // Ensure we return an array
+    const data = response.data;
+    if (!Array.isArray(data)) {
+      console.warn("GitLab API returned non-array data:", data);
+      return [];
+    }
+
+    return data;
   } catch (error) {
     console.error("Error fetching GitLab projects:", error);
     return [];
