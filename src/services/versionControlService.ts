@@ -1,36 +1,43 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export interface Repository {
   id: number;
   name: string;
-  full_name: string;
-  description: string | null;
-  private: boolean;
-  clone_url: string;
-  html_url: string;
-  default_branch: string;
-  updated_at: string;
-  visibility?: string;
+  full_name?: string;
+  description?: string | null;
+  private?: boolean;
+  clone_url?: string;
+  html_url?: string;
+  default_branch?: string;
+  updated_at?: string;
+  archived?: boolean;
   owner?: {
-    login: string;
-    avatar_url: string;
+    login?: string;
+    avatar_url?: string;
+    [key: string]: any;
   };
+  language?: string;
+  [key: string]: any; // ALLOW extra
 }
 
 export interface GitLabProject {
   id: number;
   name: string;
-  path_with_namespace: string;
-  description: string | null;
-  visibility: string;
-  web_url: string;
-  default_branch: string;
-  last_activity_at: string;
+  description?: string | null;
+  default_branch?: string;
+  archived?: boolean;
+  visibility?: string;
+  web_url?: string;
+  path_with_namespace?: string;
   namespace?: {
-    name: string;
-    full_path: string;
+    name?: string;
+    avatar_url?: string | null;
+    [key: string]: any;
   };
+  last_activity_at?: string;
+  http_url_to_repo?: string;
+  ssh_url_to_repo?: string;
+  [key: string]: any; // ALLOW extra
 }
 
 export const fetchGitHubRepositories = async (): Promise<Repository[]> => {
@@ -41,7 +48,6 @@ export const fetchGitHubRepositories = async (): Promise<Repository[]> => {
       return [];
     }
 
-    console.log("Fetching GitHub repositories...");
     const response = await supabase.functions.invoke('github-data', {
       headers: {
         Authorization: `Bearer ${session.access_token}`,
@@ -55,13 +61,15 @@ export const fetchGitHubRepositories = async (): Promise<Repository[]> => {
       console.error("GitHub API error:", response.error);
       return [];
     }
-
-    // Ensure we return an array
-    const data = response.data;
+    // We expect the data to be an array, plain or otherwise
+    let data = response.data;
     if (!Array.isArray(data)) {
       console.warn("GitHub API returned non-array data:", data);
       return [];
     }
+
+    // Console log each item for debugging
+    if(data.length > 0) console.log("Sample GitHub repo:", data[0]);
 
     return data;
   } catch (error) {
@@ -77,8 +85,6 @@ export const fetchGitLabProjects = async (): Promise<GitLabProject[]> => {
       console.log("No session found");
       return [];
     }
-
-    console.log("Fetching GitLab projects...");
     const response = await supabase.functions.invoke('gitlab-data', {
       headers: {
         Authorization: `Bearer ${session.access_token}`,
@@ -92,14 +98,13 @@ export const fetchGitLabProjects = async (): Promise<GitLabProject[]> => {
       console.error("GitLab API error:", response.error);
       return [];
     }
-
-    // Ensure we return an array
-    const data = response.data;
+    let data = response.data;
     if (!Array.isArray(data)) {
       console.warn("GitLab API returned non-array data:", data);
       return [];
     }
 
+    if(data.length > 0) console.log("Sample GitLab project:", data[0]);
     return data;
   } catch (error) {
     console.error("Error fetching GitLab projects:", error);
