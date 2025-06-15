@@ -17,8 +17,77 @@ export const useVersionControl = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Re-check connections, but fetch only on demand
-  const checkConnections = async () => {
+  // Only fetch for the activeTab, and never fetch both at once
+  const [activeTab, setActiveTab] = useState<'github' | 'gitlab'>('github');
+  const [githubFetched, setGithubFetched] = useState(false);
+  const [gitlabFetched, setGitlabFetched] = useState(false);
+
+  // Check connections on mount, but don't fetch data yet
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const [githubStatus, gitlabStatus] = await Promise.all([
+          checkConnectionStatus('github'),
+          checkConnectionStatus('gitlab')
+        ]);
+        setGithubConnected(githubStatus);
+        setGitlabConnected(gitlabStatus);
+      } catch (err) {
+        setError('Failed to check platform connection.');
+      }
+      setLoading(false);
+    })();
+  }, []);
+
+  // Fetch data only for the activeTab, and only if not yet fetched
+  useEffect(() => {
+    const fetchForTab = async () => {
+      setLoading(true);
+      setError(null);
+
+      if (activeTab === 'github' && !githubFetched) {
+        try {
+          const status = await checkConnectionStatus('github');
+          setGithubConnected(status);
+          if (status) {
+            const data = await fetchGitHubRepositories();
+            setGithubRepos(data);
+          } else {
+            setGithubRepos([]);
+          }
+          setGithubFetched(true);
+        } catch (e) {
+          setError("Failed to fetch GitHub repositories.");
+          setGithubRepos([]);
+        }
+      } else if (activeTab === 'gitlab' && !gitlabFetched) {
+        try {
+          const status = await checkConnectionStatus('gitlab');
+          setGitlabConnected(status);
+          if (status) {
+            const data = await fetchGitLabProjects();
+            setGitlabProjects(data);
+          } else {
+            setGitlabProjects([]);
+          }
+          setGitlabFetched(true);
+        } catch (e) {
+          setError("Failed to fetch GitLab projects.");
+          setGitlabProjects([]);
+        }
+      }
+      setLoading(false);
+    };
+
+    fetchForTab();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  // Manual refresh resets both tabs so users can get new data if they switch
+  const refreshData = async () => {
+    setLoading(true);
+    setError(null);
     try {
       const [githubStatus, gitlabStatus] = await Promise.all([
         checkConnectionStatus('github'),
@@ -26,100 +95,41 @@ export const useVersionControl = () => {
       ]);
       setGithubConnected(githubStatus);
       setGitlabConnected(gitlabStatus);
-    } catch (err) {
-      setError('Failed to check platform connection.');
-    }
-  };
-
-  const [activeTab, setActiveTab] = useState<'github' | 'gitlab'>('github');
-  // Track if we've fetched already to avoid multiple API calls
-  const [githubFetched, setGithubFetched] = useState(false);
-  const [gitlabFetched, setGitlabFetched] = useState(false);
-
-  const fetchGitHubData = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const status = await checkConnectionStatus('github');
-      setGithubConnected(status);
-      if (status) {
-        const data = await fetchGitHubRepositories();
-        setGithubRepos(data);
-      } else {
-        setGithubRepos([]);
+      setGithubFetched(false);
+      setGitlabFetched(false);
+      // Only reload current tab data—others will load on demand
+      if (activeTab === 'github') {
+        if (githubStatus) {
+          const data = await fetchGitHubRepositories();
+          setGithubRepos(data);
+        } else {
+          setGithubRepos([]);
+        }
+        setGithubFetched(true);
+      } else if (activeTab === 'gitlab') {
+        if (gitlabStatus) {
+          const data = await fetchGitLabProjects();
+          setGitlabProjects(data);
+        } else {
+          setGitlabProjects([]);
+        }
+        setGitlabFetched(true);
       }
-      setGithubFetched(true);
-    } catch (e) {
-      setError("Failed to fetch GitHub repositories.");
-      setGithubRepos([]);
-    } finally {
-      setLoading(false);
+      toast({
+        title: "Refreshed",
+        description: "Repository data has been updated",
+      });
+    } catch {
+      setError("Unable to refresh repository data.");
     }
+    setLoading(false);
   };
 
-  const fetchGitLabData = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const status = await checkConnectionStatus('gitlab');
-      setGitlabConnected(status);
-      if (status) {
-        const data = await fetchGitLabProjects();
-        setGitlabProjects(data);
-      } else {
-        setGitlabProjects([]);
-      }
-      setGitlabFetched(true);
-    } catch (e) {
-      setError("Failed to fetch GitLab projects.");
-      setGitlabProjects([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch only for active tab
-  useEffect(() => {
-    if (activeTab === 'github' && !githubFetched) {
-      fetchGitHubData();
-    }
-    if (activeTab === 'gitlab' && !gitlabFetched) {
-      fetchGitLabData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
-
-  // Used by page/tab to fetch only what is needed
+  // Used by page/tab to manually switch
   const fetchDataForTab = async (tab: 'github' | 'gitlab') => {
     setActiveTab(tab);
-    if (tab === 'github' && !githubFetched) {
-      await fetchGitHubData();
-    } else if (tab === 'gitlab' && !gitlabFetched) {
-      await fetchGitLabData();
-    }
+    // No immediate fetch here; effect will trigger correctly on tab switch
   };
-
-  // For manual refresh (refreshes both)
-  const refreshData = async () => {
-    setLoading(true);
-    setError(null);
-    await checkConnections();
-    setGithubFetched(false);
-    setGitlabFetched(false);
-    await Promise.all([fetchGitHubData(), fetchGitLabData()]);
-    setLoading(false);
-    toast({
-      title: "Refreshed",
-      description: "Repository data has been updated",
-    });
-  };
-
-  // Change: don't run both fetches on mount, only check connections
-  useEffect(() => {
-    (async () => {
-      await checkConnections();
-    })();
-  }, []);
 
   return {
     githubRepos,
@@ -130,8 +140,19 @@ export const useVersionControl = () => {
     error,
     refreshData,
     fetchDataForTab,
-    activeTab, // expose current tab
-    setActiveTab, // expose setter
-    checkConnections,
+    activeTab,
+    setActiveTab,
+    checkConnections: async () => {
+      try {
+        const [githubStatus, gitlabStatus] = await Promise.all([
+          checkConnectionStatus('github'),
+          checkConnectionStatus('gitlab')
+        ]);
+        setGithubConnected(githubStatus);
+        setGitlabConnected(gitlabStatus);
+      } catch (e) {
+        setError('Failed to check platform connection.');
+      }
+    }
   };
 };

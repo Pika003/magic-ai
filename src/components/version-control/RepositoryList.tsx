@@ -1,6 +1,7 @@
+
 import React, { useState, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Github, Gitlab, Search, Star, StarOff, Filter } from 'lucide-react';
+import { Github, Gitlab, Search, Filter } from 'lucide-react';
 import { GitHubRepository, GitLabProject } from '@/services/versionControlService';
 import { GitHubRepoCard } from './GitHubRepoCard';
 import { GitLabProjectCard } from './GitLabProjectCard';
@@ -24,8 +25,6 @@ const SORT_OPTIONS: { label: string; value: SortingOption }[] = [
   { label: "Name (A-Z)", value: "name" },
 ];
 
-const FAVORITES_KEY = "repo-favorites";
-
 export const RepositoryList: React.FC<RepositoryListProps> = ({
   githubRepos = [],
   gitlabProjects = [],
@@ -38,25 +37,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const [search, setSearch] = useState("");
   const [sorting, setSorting] = useState<SortingOption>("updated");
   const [page, setPage] = useState(1);
-  const [favorites, setFavorites] = useState<{ [id: string]: boolean }>(() => {
-    // Restore from localStorage
-    try {
-      const stored = localStorage.getItem(FAVORITES_KEY);
-      return stored ? JSON.parse(stored) : {};
-    } catch {
-      return {};
-    }
-  });
   const [modalRepo, setModalRepo] = useState<GitHubRepository | GitLabProject | null>(null);
-
-  // Helper functions
-  const handleFavorite = (id: string | number, isFav: boolean) => {
-    setFavorites(favs => {
-      const newFavs = { ...favs, [id]: isFav };
-      localStorage.setItem(FAVORITES_KEY, JSON.stringify(newFavs));
-      return newFavs;
-    });
-  };
 
   // Filtering & Sorting (GitHub)
   const filteredGithubRepos = useMemo(() => {
@@ -171,20 +152,6 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {paginatedGithubRepos.map((repo) => (
                 <div key={repo.id} className="relative group">
-                  <button
-                    className="absolute top-2 right-2 p-1 z-10"
-                    onClick={e => {
-                      e.stopPropagation();
-                      handleFavorite(repo.id, !favorites[repo.id]);
-                    }}
-                    title={favorites[repo.id] ? "Remove from favorites" : "Mark as favorite"}
-                  >
-                    {favorites[repo.id] ? (
-                      <Star className="text-yellow-400 fill-yellow-400 w-5 h-5" />
-                    ) : (
-                      <StarOff className="text-muted-foreground w-5 h-5" />
-                    )}
-                  </button>
                   <div
                     role="button"
                     tabIndex={0}
@@ -222,7 +189,6 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             tab="github"
             isOpen={!!modalRepo}
             onClose={closeModal}
-            isFavorite={!!favorites[modalRepo.id]}
           />
         )}
       </div>
@@ -281,20 +247,6 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {paginatedGitlabProjects.map((project) => (
               <div key={project.id} className="relative group">
-                <button
-                  className="absolute top-2 right-2 p-1 z-10"
-                  onClick={e => {
-                    e.stopPropagation();
-                    handleFavorite(project.id, !favorites[project.id]);
-                  }}
-                  title={favorites[project.id] ? "Remove from favorites" : "Mark as favorite"}
-                >
-                  {favorites[project.id] ? (
-                    <Star className="text-yellow-400 fill-yellow-400 w-5 h-5" />
-                  ) : (
-                    <StarOff className="text-muted-foreground w-5 h-5" />
-                  )}
-                </button>
                 <div
                   role="button"
                   tabIndex={0}
@@ -332,7 +284,6 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           tab="gitlab"
           isOpen={!!modalRepo}
           onClose={closeModal}
-          isFavorite={!!favorites[modalRepo.id]}
         />
       )}
     </div>
