@@ -25,6 +25,7 @@ export const ProfilePage = () => {
   const [saving, setSaving] = useState(false);
   const [openaiKey, setOpenaiKey] = useState('');
   const [keyLoading, setKeyLoading] = useState(false);
+  const [isPaidUser, setIsPaidUser] = useState(false);
 
   // Form state
   const [fullName, setFullName] = useState('');
@@ -34,6 +35,7 @@ export const ProfilePage = () => {
     if (user) {
       fetchProfile();
       fetchOpenAIKey();
+      fetchPaidStatus();
     }
   }, [user]);
 
@@ -80,6 +82,22 @@ export const ProfilePage = () => {
       }
     } catch (error) {
       console.error('Error fetching API key:', error);
+    }
+  };
+
+  const fetchPaidStatus = async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('paid_user')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (!error && data) {
+        setIsPaidUser(!!data.paid_user);
+      }
+    } catch (e) {
+      // ignore
     }
   };
 
@@ -291,6 +309,13 @@ export const ProfilePage = () => {
             <GoogleCalendarIntegration />
           </Card>
         </div>
+        {isPaidUser && (
+          <div className="mb-8">
+            <div className="p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg font-semibold text-center">
+              You have unlimited usage unlocked! 🎉
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

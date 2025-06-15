@@ -15,6 +15,7 @@ export type Database = {
           feature_name: string
           id: string
           last_used_at: string
+          reset_date: string | null
           updated_at: string
           usage_count: number
           user_id: string
@@ -24,6 +25,7 @@ export type Database = {
           feature_name: string
           id?: string
           last_used_at?: string
+          reset_date?: string | null
           updated_at?: string
           usage_count?: number
           user_id: string
@@ -33,6 +35,7 @@ export type Database = {
           feature_name?: string
           id?: string
           last_used_at?: string
+          reset_date?: string | null
           updated_at?: string
           usage_count?: number
           user_id?: string
@@ -131,6 +134,7 @@ export type Database = {
           created_at: string
           full_name: string | null
           id: string
+          paid_user: boolean
           updated_at: string
           username: string | null
         }
@@ -139,6 +143,7 @@ export type Database = {
           created_at?: string
           full_name?: string | null
           id: string
+          paid_user?: boolean
           updated_at?: string
           username?: string | null
         }
@@ -147,6 +152,7 @@ export type Database = {
           created_at?: string
           full_name?: string | null
           id?: string
+          paid_user?: boolean
           updated_at?: string
           username?: string | null
         }
@@ -306,6 +312,10 @@ export type Database = {
       increment_feature_usage: {
         Args: { p_user_id: string; p_feature_name: string }
         Returns: number
+      }
+      reset_feature_usage_monthly: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
     }
     Enums: {
