@@ -6,10 +6,8 @@ declare global {
       client: {
         init: (config: {
           discoveryDocs: string[];
-          clientId: string;
-          scope: string;
         }) => Promise<void>;
-        setApiKey: (apiKey: string) => void;
+        setToken: (token: { access_token: string }) => void;
         calendar: {
           events: {
             list: (params: {
@@ -40,15 +38,21 @@ declare global {
           };
         };
       };
-      auth2: {
-        getAuthInstance: () => {
-          signIn: () => Promise<{
-            getAuthResponse: (includeAuthorizationData?: boolean) => {
+    };
+    google: {
+      accounts: {
+        oauth2: {
+          initTokenClient: (config: {
+            client_id: string;
+            scope: string;
+            callback: (response: {
               access_token: string;
-              refresh_token?: string;
               expires_in: number;
-            };
-          }>;
+              error?: string;
+            }) => void;
+          }) => {
+            requestAccessToken: () => void;
+          };
         };
       };
     };

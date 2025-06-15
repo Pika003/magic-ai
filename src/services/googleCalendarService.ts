@@ -14,62 +14,100 @@ export interface CalendarEvent {
   location?: string;
 }
 
+let gapiInited = false;
+let gisInited = false;
+let tokenClient: any = null;
+
 export const initializeGoogleAPI = async (): Promise<void> => {
   return new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = 'https://apis.google.com/js/api.js';
-    script.onload = () => {
-      window.gapi.load('client:auth2', async () => {
+    // Load Google Identity Services
+    const gisScript = document.createElement('script');
+    gisScript.src = 'https://accounts.google.com/gsi/client';
+    gisScript.onload = () => {
+      gisInited = true;
+      checkInitialization();
+    };
+    gisScript.onerror = reject;
+    document.head.appendChild(gisScript);
+
+    // Load Google API client
+    const gapiScript = document.createElement('script');
+    gapiScript.src = 'https://apis.google.com/js/api.js';
+    gapiScript.onload = () => {
+      window.gapi.load('client', async () => {
         try {
           await window.gapi.client.init({
             discoveryDocs: [GOOGLE_DISCOVERY_DOC],
-            clientId: GOOGLE_CLIENT_ID,
-            scope: GOOGLE_SCOPES
           });
-          resolve();
+          gapiInited = true;
+          checkInitialization();
         } catch (error) {
           reject(error);
         }
       });
     };
-    script.onerror = reject;
-    document.head.appendChild(script);
+    gapiScript.onerror = reject;
+    document.head.appendChild(gapiScript);
+
+    function checkInitialization() {
+      if (gapiInited && gisInited) {
+        resolve();
+      }
+    }
   });
 };
 
 export const authenticateGoogleCalendar = async (userId: string): Promise<{ success: boolean; error?: string }> => {
-  try {
-    const authInstance = window.gapi.auth2.getAuthInstance();
-    const user = await authInstance.signIn();
-    const authResponse = user.getAuthResponse();
-    
-    if (!authResponse.access_token) {
-      return { success: false, error: 'Failed to get access token' };
-    }
+  return new Promise((resolve) => {
+    try {
+      if (!window.google?.accounts?.oauth2) {
+        resolve({ success: false, error: 'Google Identity Services not loaded' });
+        return;
+      }
 
-    // Calculate expires_at
-    const expiresAt = new Date(Date.now() + (authResponse.expires_in * 1000));
+      tokenClient = window.google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: GOOGLE_SCOPES,
+        callback: async (tokenResponse: any) => {
+          if (tokenResponse.error) {
+            resolve({ success: false, error: tokenResponse.error });
+            return;
+          }
 
-    // Store tokens in database
-    const { error } = await supabase
-      .from('user_google_tokens')
-      .upsert({
-        user_id: userId,
-        access_token: authResponse.access_token,
-        refresh_token: user.getAuthResponse(true).refresh_token || '',
-        expires_at: expiresAt.toISOString()
+          try {
+            // Calculate expires_at (token typically expires in 1 hour)
+            const expiresAt = new Date(Date.now() + (tokenResponse.expires_in * 1000));
+
+            // Store tokens in database
+            const { error } = await supabase
+              .from('user_google_tokens')
+              .upsert({
+                user_id: userId,
+                access_token: tokenResponse.access_token,
+                refresh_token: '', // OAuth2 flow doesn't provide refresh token in this context
+                expires_at: expiresAt.toISOString()
+              });
+
+            if (error) {
+              console.error('Error storing tokens:', error);
+              resolve({ success: false, error: 'Failed to store authentication tokens' });
+              return;
+            }
+
+            resolve({ success: true });
+          } catch (error) {
+            console.error('Error processing token:', error);
+            resolve({ success: false, error: 'Failed to process authentication token' });
+          }
+        },
       });
 
-    if (error) {
-      console.error('Error storing tokens:', error);
-      return { success: false, error: 'Failed to store authentication tokens' };
+      tokenClient.requestAccessToken();
+    } catch (error) {
+      console.error('Google Calendar authentication error:', error);
+      resolve({ success: false, error: 'Authentication failed' });
     }
-
-    return { success: true };
-  } catch (error) {
-    console.error('Google Calendar authentication error:', error);
-    return { success: false, error: 'Authentication failed' };
-  }
+  });
 };
 
 export const getTodaysEvents = async (userId: string): Promise<CalendarEvent[]> => {
@@ -86,18 +124,19 @@ export const getTodaysEvents = async (userId: string): Promise<CalendarEvent[]> 
       return [];
     }
 
-    // Check if token is expired and refresh if needed
+    // Check if token is expired
     const now = new Date();
     const expiresAt = new Date(tokenData.expires_at);
     
     if (now >= expiresAt) {
-      // Token expired, need to refresh or re-authenticate
       console.log('Token expired, need to re-authenticate');
       return [];
     }
 
-    // Set the access token
-    window.gapi.client.setApiKey(tokenData.access_token);
+    // Set the access token for gapi client
+    window.gapi.client.setToken({
+      access_token: tokenData.access_token
+    });
 
     // Get today's date range
     const today = new Date();
