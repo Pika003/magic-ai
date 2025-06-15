@@ -1,34 +1,19 @@
 
 import React, { useState, useEffect } from 'react';
 import { Progress } from '@/components/ui/progress';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useUsageTracking } from '@/hooks/useUsageTracking';
 
 export const UsageStatsCard = () => {
-  const { user } = useAuth();
-  const [totalUsage, setTotalUsage] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const { totalUsage, loading, fetchTotalUsage } = useUsageTracking();
 
-  const fetchUsageStats = async () => {
-    if (!user) return;
-
-    try {
-      const { data: totalData, error: totalError } = await supabase.rpc('get_total_usage', {
-        p_user_id: user.id
-      });
-      if (totalError) throw totalError;
-      setTotalUsage(totalData || 0);
-    } catch (error) {
-      console.error('Error fetching usage stats:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Refresh usage stats every 10 seconds to show real-time updates
   useEffect(() => {
-    fetchUsageStats();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+    const interval = setInterval(() => {
+      fetchTotalUsage();
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [fetchTotalUsage]);
 
   const usagePercentage = Math.min((totalUsage / 50) * 100, 100);
 
@@ -54,6 +39,10 @@ export const UsageStatsCard = () => {
         
         <div className="text-xs text-slate-400 text-center">
           {loading ? 'Loading...' : `${Math.round(usagePercentage)}% of monthly limit used`}
+        </div>
+        
+        <div className="text-xs text-slate-500 text-center">
+          Updates every 10 seconds
         </div>
       </div>
     </div>

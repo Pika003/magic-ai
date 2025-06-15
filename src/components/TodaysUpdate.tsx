@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -8,6 +7,7 @@ import { Calendar, MessageSquare, RefreshCw, Copy, Send } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { formatDailyUpdateWithAI } from '@/services/openaiService';
 import { Layout } from '@/components/Layout';
+import { useUsageTracking } from '@/hooks/useUsageTracking';
 
 interface DailyUpdate {
   id: string;
@@ -21,6 +21,7 @@ export const TodaysUpdate = () => {
   const [formattedUpdate, setFormattedUpdate] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [dailyUpdates, setDailyUpdates] = useState<DailyUpdate[]>([]);
+  const { incrementUsage, hasReachedLimit } = useUsageTracking();
 
   const processUpdate = async (isRefresh: boolean = false) => {
     if (!inputText.trim()) {
@@ -32,9 +33,24 @@ export const TodaysUpdate = () => {
       return;
     }
 
+    if (hasReachedLimit) {
+      toast({
+        title: "Usage Limit Reached",
+        description: "You've reached your usage limit. Please upgrade to continue.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsProcessing(true);
     
     try {
+      // Track usage before making API call
+      const usageSuccess = await incrementUsage('daily_update_format');
+      if (!usageSuccess) {
+        return; // Usage tracking will show the appropriate error
+      }
+
       const formatted = await formatDailyUpdateWithAI(inputText, isRefresh);
       setFormattedUpdate(formatted);
       
@@ -114,7 +130,7 @@ export const TodaysUpdate = () => {
                 <div className="flex items-center space-x-2">
                   <Button 
                     onClick={() => processUpdate(false)}
-                    disabled={isProcessing || !inputText.trim()}
+                    disabled={isProcessing || !inputText.trim() || hasReachedLimit}
                     className="bg-blue-500 hover:bg-blue-600"
                   >
                     {isProcessing ? (
@@ -132,7 +148,7 @@ export const TodaysUpdate = () => {
                   <Button 
                     variant="outline" 
                     onClick={handleRefresh}
-                    disabled={isProcessing || !inputText.trim()}
+                    disabled={isProcessing || !inputText.trim() || hasReachedLimit}
                   >
                     <RefreshCw className="w-4 h-4 mr-2" />
                     Refresh

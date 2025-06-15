@@ -4,17 +4,18 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, MessageSquare, RefreshCw, Copy, Send } from 'lucide-react';
+import { CheckCircle, RefreshCw, Copy, History, Sparkles } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { correctSentenceWithAI } from '@/services/openaiService';
 import { Layout } from '@/components/Layout';
+import { useUsageTracking } from '@/hooks/useUsageTracking';
 
-interface CorrectedSentence {
+interface CorrectionHistory {
   id: string;
   originalText: string;
   correctedText: string;
   improvements: string[];
-  correctedAt: string;
+  timestamp: string;
 }
 
 export const CorrectSentence = () => {
@@ -22,13 +23,23 @@ export const CorrectSentence = () => {
   const [correctedText, setCorrectedText] = useState('');
   const [improvements, setImprovements] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [correctedSentences, setCorrectedSentences] = useState<CorrectedSentence[]>([]);
+  const [history, setHistory] = useState<CorrectionHistory[]>([]);
+  const { incrementUsage, hasReachedLimit } = useUsageTracking();
 
-  const processText = async (isRefresh: boolean = false) => {
+  const processSentence = async (isRefresh: boolean = false) => {
     if (!inputText.trim()) {
       toast({
         title: "Error",
-        description: "Please enter some text to correct.",
+        description: "Please enter a sentence to correct.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (hasReachedLimit) {
+      toast({
+        title: "Usage Limit Reached",
+        description: "You've reached your usage limit. Please upgrade to continue.",
         variant: "destructive"
       });
       return;
@@ -37,13 +48,29 @@ export const CorrectSentence = () => {
     setIsProcessing(true);
     
     try {
+      // Track usage before making API call
+      const usageSuccess = await incrementUsage('sentence_correction');
+      if (!usageSuccess) {
+        return; // Usage tracking will show the appropriate error
+      }
+
       const result = await correctSentenceWithAI(inputText, isRefresh);
       setCorrectedText(result.correctedText);
       setImprovements(result.improvements);
       
+      // Add to history
+      const newEntry: CorrectionHistory = {
+        id: Date.now().toString(),
+        originalText: inputText,
+        correctedText: result.correctedText,
+        improvements: result.improvements,
+        timestamp: new Date().toLocaleString()
+      };
+      setHistory(prev => [newEntry, ...prev]);
+      
       toast({
         title: "Sentence Corrected!",
-        description: isRefresh ? "Generated a new variation of your corrected sentence." : "Your sentence has been corrected using AI.",
+        description: isRefresh ? "Generated a new correction for your sentence." : "Your sentence has been corrected and improved.",
       });
     } catch (error) {
       toast({
@@ -57,34 +84,21 @@ export const CorrectSentence = () => {
   };
 
   const handleRefresh = () => {
-    processText(true);
-  };
-
-  const saveCorrection = () => {
-    const newCorrection: CorrectedSentence = {
-      id: Date.now().toString(),
-      originalText: inputText,
-      correctedText: correctedText,
-      improvements: improvements,
-      correctedAt: new Date().toLocaleString()
-    };
-
-    setCorrectedSentences([newCorrection, ...correctedSentences]);
-    setInputText('');
-    setCorrectedText('');
-    setImprovements([]);
-    
-    toast({
-      title: "Correction Saved!",
-      description: "Your corrected sentence has been saved.",
-    });
+    processSentence(true);
   };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast({
       title: "Copied!",
-      description: "Text copied to clipboard.",
+      description: "Corrected text copied to clipboard.",
+    });
+  };
+
+  const saveCorrection = () => {
+    toast({
+      title: "Correction Saved!",
+      description: "Your correction has been saved to history.",
     });
   };
 
@@ -95,7 +109,7 @@ export const CorrectSentence = () => {
           {/* Header Section */}
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-slate-800 mb-2">Correct Sentence</h1>
-            <p className="text-slate-600">Instantly improve your sentences with AI-powered corrections</p>
+            <p className="text-slate-600">AI-powered sentence correction with grammar and style improvements</p>
           </div>
 
           {/* Main Input/Output Grid */}
@@ -104,13 +118,13 @@ export const CorrectSentence = () => {
             <Card className="border-slate-200">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <MessageSquare className="w-5 h-5 text-blue-500" />
+                  <Sparkles className="w-5 h-5 text-blue-500" />
                   <span>Original Text</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Textarea
-                  placeholder="Enter your text here for correction..."
+                  placeholder="Enter your sentence here... The quick brown fox jump over the lazy dog"
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   className="min-h-32 resize-none border-slate-200 focus:border-blue-500"
@@ -118,8 +132,8 @@ export const CorrectSentence = () => {
                 
                 <div className="flex items-center space-x-2">
                   <Button 
-                    onClick={() => processText(false)}
-                    disabled={isProcessing || !inputText.trim()}
+                    onClick={() => processSentence(false)}
+                    disabled={isProcessing || !inputText.trim() || hasReachedLimit}
                     className="bg-blue-500 hover:bg-blue-600"
                   >
                     {isProcessing ? (
@@ -137,7 +151,7 @@ export const CorrectSentence = () => {
                   <Button 
                     variant="outline" 
                     onClick={handleRefresh}
-                    disabled={isProcessing || !inputText.trim()}
+                    disabled={isProcessing || !inputText.trim() || hasReachedLimit}
                   >
                     <RefreshCw className="w-4 h-4 mr-2" />
                     Refresh
@@ -157,41 +171,44 @@ export const CorrectSentence = () => {
               <CardContent>
                 <div className="min-h-32 p-4 bg-green-50 border border-green-200 rounded-lg mb-4">
                   {correctedText ? (
-                    <div className="text-slate-800">{correctedText}</div>
+                    <div className="text-slate-800 whitespace-pre-wrap">{correctedText}</div>
                   ) : (
                     <p className="text-slate-400 italic">Corrected text will appear here...</p>
                   )}
                 </div>
                 
-                {improvements.length > 0 && (
-                  <div className="mb-4">
-                    <p className="text-sm font-medium text-slate-700 mb-2">Improvements made:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {improvements.map((improvement, index) => (
-                        <Badge key={index} variant="secondary" className="text-xs">
-                          {improvement}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
                 {correctedText && (
-                  <div className="flex space-x-2">
-                    <Button 
-                      onClick={saveCorrection}
-                      className="flex-1 bg-green-500 hover:bg-green-600"
-                    >
-                      <Send className="w-4 h-4 mr-2" />
-                      Save Correction
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => copyToClipboard(correctedText)}
-                    >
-                      <Copy className="w-4 h-4" />
-                    </Button>
+                  <div className="space-y-3">
+                    <div className="flex space-x-2">
+                      <Button 
+                        onClick={saveCorrection}
+                        className="flex-1 bg-green-500 hover:bg-green-600"
+                      >
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Save Correction
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copyToClipboard(correctedText)}
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    
+                    {improvements.length > 0 && (
+                      <div className="mt-4">
+                        <h4 className="text-sm font-medium text-slate-700 mb-2">Improvements Made:</h4>
+                        <ul className="space-y-1">
+                          {improvements.map((improvement, index) => (
+                            <li key={index} className="text-sm text-slate-600 flex items-start space-x-2">
+                              <CheckCircle className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
+                              <span>{improvement}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -203,65 +220,64 @@ export const CorrectSentence = () => {
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <CheckCircle className="w-5 h-5 text-slate-600" />
+                  <History className="w-5 h-5 text-slate-600" />
                   <span>Correction History</span>
                 </div>
                 <Badge variant="secondary">
-                  {correctedSentences.length} corrections
+                  {history.length} corrections
                 </Badge>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {correctedSentences.length === 0 ? (
+              {history.length === 0 ? (
                 <div className="text-center py-12">
-                  <MessageSquare className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                  <History className="w-12 h-12 text-slate-300 mx-auto mb-4" />
                   <p className="text-slate-500">No corrections yet</p>
                   <p className="text-slate-400 text-sm mt-2">Start correcting sentences to see your history here</p>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {correctedSentences.map((correction) => (
+                  {history.map((entry) => (
                     <div 
-                      key={correction.id}
+                      key={entry.id}
                       className="p-4 border border-slate-200 rounded-lg"
                     >
                       <div className="flex items-center justify-between mb-3">
-                        <span className="text-sm text-slate-500">{correction.correctedAt}</span>
+                        <span className="text-sm text-slate-500">{entry.timestamp}</span>
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => copyToClipboard(correction.correctedText)}
+                          onClick={() => copyToClipboard(entry.correctedText)}
                         >
                           <Copy className="w-4 h-4" />
                         </Button>
                       </div>
                       
-                      <div className="mb-3">
-                        <p className="text-sm font-medium text-slate-700 mb-1">Original:</p>
-                        <div className="bg-red-50 p-3 rounded border border-red-200 text-red-800 text-sm">
-                          {correction.originalText}
+                      <div className="space-y-3">
+                        <div className="bg-slate-50 p-3 rounded border">
+                          <p className="text-sm font-medium text-slate-700 mb-1">Original:</p>
+                          <div className="text-slate-600 text-sm">{entry.originalText}</div>
                         </div>
-                      </div>
-                      
-                      <div className="mb-3">
-                        <p className="text-sm font-medium text-slate-700 mb-1">Corrected:</p>
-                        <div className="bg-green-50 p-3 rounded border border-green-200 text-green-800 text-sm">
-                          {correction.correctedText}
+                        
+                        <div className="bg-green-50 p-3 rounded border border-green-200">
+                          <p className="text-sm font-medium text-green-700 mb-1">Corrected:</p>
+                          <div className="text-green-800 text-sm">{entry.correctedText}</div>
                         </div>
-                      </div>
-                      
-                      {correction.improvements.length > 0 && (
-                        <div>
-                          <p className="text-sm font-medium text-slate-700 mb-1">Improvements:</p>
-                          <div className="flex flex-wrap gap-1">
-                            {correction.improvements.map((improvement, index) => (
-                              <Badge key={index} variant="secondary" className="text-xs">
-                                {improvement}
-                              </Badge>
-                            ))}
+                        
+                        {entry.improvements.length > 0 && (
+                          <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                            <p className="text-sm font-medium text-blue-700 mb-2">Improvements:</p>
+                            <ul className="space-y-1">
+                              {entry.improvements.map((improvement, index) => (
+                                <li key={index} className="text-sm text-blue-600 flex items-start space-x-2">
+                                  <CheckCircle className="w-3 h-3 text-blue-500 mt-0.5 flex-shrink-0" />
+                                  <span>{improvement}</span>
+                                </li>
+                              ))}
+                            </ul>
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

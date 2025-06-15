@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,6 +9,7 @@ import { toast } from '@/hooks/use-toast';
 import { generateClientUpdateWithAI, generateCommitMessageWithAI } from '@/services/openaiService';
 import { Layout } from '@/components/Layout';
 import { supabase } from '@/integrations/supabase/client';
+import { useUsageTracking } from '@/hooks/useUsageTracking';
 
 interface ClientUpdate {
   id: string;
@@ -33,6 +33,7 @@ export const ClientUpdate = () => {
   const [commitSummary, setCommitSummary] = useState('');
   const [commitMessage, setCommitMessage] = useState('');
   const [isCommitGenerating, setIsCommitGenerating] = useState(false);
+  const { incrementUsage, hasReachedLimit } = useUsageTracking();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -61,9 +62,24 @@ export const ClientUpdate = () => {
       return;
     }
 
+    if (hasReachedLimit) {
+      toast({
+        title: "Usage Limit Reached",
+        description: "You've reached your usage limit. Please upgrade to continue.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsProcessing(true);
 
     try {
+      // Track usage before making API call
+      const usageSuccess = await incrementUsage('client_update_generation');
+      if (!usageSuccess) {
+        return; // Usage tracking will show the appropriate error
+      }
+
       const formatted = await generateClientUpdateWithAI(originalMessage, clientName, liveLink, yourName, isRefresh);
       setFormattedUpdate(formatted);
 
@@ -79,6 +95,50 @@ export const ClientUpdate = () => {
       });
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const processCommitMessage = async () => {
+    if (!commitSummary.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a summary or details to generate a commit message.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (hasReachedLimit) {
+      toast({
+        title: "Usage Limit Reached",
+        description: "You've reached your usage limit. Please upgrade to continue.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsCommitGenerating(true);
+    try {
+      // Track usage before making API call
+      const usageSuccess = await incrementUsage('commit_message_generation');
+      if (!usageSuccess) {
+        return; // Usage tracking will show the appropriate error
+      }
+
+      const result = await generateCommitMessageWithAI(commitSummary);
+      setCommitMessage(result);
+      toast({
+        title: "Commit Message Generated!",
+        description: "Your professional commit message is ready.",
+      });
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to generate commit message.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCommitGenerating(false);
     }
   };
 
@@ -123,34 +183,6 @@ export const ClientUpdate = () => {
     const body = encodeURIComponent(formattedUpdate);
     const to = recipientEmail ? encodeURIComponent(recipientEmail) : '';
     return `mailto:${to}?subject=${subject}&body=${body}`;
-  };
-
-  const processCommitMessage = async () => {
-    if (!commitSummary.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a summary or details to generate a commit message.",
-        variant: "destructive"
-      });
-      return;
-    }
-    setIsCommitGenerating(true);
-    try {
-      const result = await generateCommitMessageWithAI(commitSummary);
-      setCommitMessage(result);
-      toast({
-        title: "Commit Message Generated!",
-        description: "Your professional commit message is ready.",
-      });
-    } catch {
-      toast({
-        title: "Error",
-        description: "Failed to generate commit message.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsCommitGenerating(false);
-    }
   };
 
   const copyCommitMessage = () => {
@@ -222,7 +254,7 @@ export const ClientUpdate = () => {
                 <div className="flex items-center space-x-2">
                   <Button
                     onClick={() => processMessage(false)}
-                    disabled={isProcessing || !originalMessage.trim() || !clientName.trim()}
+                    disabled={isProcessing || !originalMessage.trim() || !clientName.trim() || hasReachedLimit}
                     className="bg-blue-500 hover:bg-blue-600"
                   >
                     {isProcessing ? (
@@ -240,7 +272,7 @@ export const ClientUpdate = () => {
                   <Button
                     variant="outline"
                     onClick={handleRefresh}
-                    disabled={isProcessing || !originalMessage.trim() || !clientName.trim()}
+                    disabled={isProcessing || !originalMessage.trim() || !clientName.trim() || hasReachedLimit}
                   >
                     <RefreshCw className="w-4 h-4 mr-2" />
                     Refresh
@@ -347,7 +379,7 @@ export const ClientUpdate = () => {
               <div className="flex items-center gap-2">
                 <Button
                   onClick={processCommitMessage}
-                  disabled={isCommitGenerating || !commitSummary.trim()}
+                  disabled={isCommitGenerating || !commitSummary.trim() || hasReachedLimit}
                   className="bg-violet-700 hover:bg-violet-800"
                 >
                   {isCommitGenerating ? (
