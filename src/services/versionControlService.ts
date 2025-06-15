@@ -79,30 +79,31 @@ export const fetchGitHubRepositories = async (): Promise<GitHubRepository[]> => 
       body: { kind: 'repos' }
     });
 
-    // Check for token expiration errors
-    if (response.error && response.error.includes && response.error.includes('expired')) {
-      console.error("GitHub token expired:", response.error);
+    // Check for function call errors first
+    if (response.error) {
+      console.error("GitHub function error:", response.error);
+      await handleTokenExpiration('github');
+      return [];
+    }
+
+    // Check for token expiration in the response data
+    if (response.data && typeof response.data === 'string' && response.data.includes('expired')) {
+      console.error("GitHub token expired:", response.data);
       await handleTokenExpiration('github');
       return [];
     }
 
     let repos: GitHubRepository[] = [];
     // If response is a string (JSON array), parse it
-    if (typeof response === 'string') {
-      repos = JSON.parse(response);
-    } else if (typeof (response as any)?.data === 'string') {
-      repos = JSON.parse((response as any).data);
-    } else if (Array.isArray(response)) {
-      repos = response as GitHubRepository[];
-    } else if (Array.isArray((response as any)?.data)) {
-      repos = (response as any).data;
-    } else if (Array.isArray((response as any)?.data?.data)) {
-      repos = (response as any).data.data;
+    if (typeof response.data === 'string') {
+      repos = JSON.parse(response.data);
+    } else if (Array.isArray(response.data)) {
+      repos = response.data;
     } else {
       console.error("GitHub API error or non-array data:", response);
-      // Check if it's a token expiration error
-      if (response && typeof response === 'object' && 
-          (response.error_description?.includes('expired') || response.error?.includes('expired'))) {
+      // Check if it's a token expiration error in the response data
+      if (response.data && typeof response.data === 'object' && 
+          (response.data.error_description?.includes('expired') || response.data.error?.includes('expired'))) {
         await handleTokenExpiration('github');
       }
       return [];
@@ -131,30 +132,31 @@ export const fetchGitLabProjects = async (): Promise<GitLabProject[]> => {
       body: { kind: 'projects' }
     });
 
-    // Check for token expiration errors
-    if (response.error && response.error.includes && response.error.includes('expired')) {
-      console.error("GitLab token expired:", response.error);
+    // Check for function call errors first
+    if (response.error) {
+      console.error("GitLab function error:", response.error);
+      await handleTokenExpiration('gitlab');
+      return [];
+    }
+
+    // Check for token expiration in the response data
+    if (response.data && typeof response.data === 'string' && response.data.includes('expired')) {
+      console.error("GitLab token expired:", response.data);
       await handleTokenExpiration('gitlab');
       return [];
     }
 
     let projects: GitLabProject[] = [];
     // If response is a string (JSON array), parse it
-    if (typeof response === 'string') {
-      projects = JSON.parse(response);
-    } else if (typeof (response as any)?.data === 'string') {
-      projects = JSON.parse((response as any).data);
-    } else if (Array.isArray(response)) {
-      projects = response as GitLabProject[];
-    } else if (Array.isArray((response as any)?.data)) {
-      projects = (response as any).data;
-    } else if (Array.isArray((response as any)?.data?.data)) {
-      projects = (response as any).data.data;
+    if (typeof response.data === 'string') {
+      projects = JSON.parse(response.data);
+    } else if (Array.isArray(response.data)) {
+      projects = response.data;
     } else {
       console.error("GitLab API error or non-array data:", response);
-      // Check if it's a token expiration error
-      if (response && typeof response === 'object' && 
-          (response.error_description?.includes('expired') || response.error?.includes('expired'))) {
+      // Check if it's a token expiration error in the response data
+      if (response.data && typeof response.data === 'object' && 
+          (response.data.error_description?.includes('expired') || response.data.error?.includes('expired'))) {
         await handleTokenExpiration('gitlab');
       }
       return [];
