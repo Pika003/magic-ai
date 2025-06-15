@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -59,17 +60,25 @@ const handleOAuthStart = async (provider: 'github' | 'gitlab') => {
   }
 
   try {
+    // Always POST to /start and include token
     const res = await fetch(endpoint, {
-      method: "GET",
+      method: "POST",
       headers: {
         'Authorization': `Bearer ${session.access_token}`,
         'apikey': anonKey,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        supabaseToken: session.access_token,
+      })
     });
     const data = await res.json();
     if (data.url) {
-      // Open the OAuth link in a new tab for verification
-      window.open(data.url, "_blank", "noopener,noreferrer");
+      // Manually append supabaseToken
+      const urlWithToken = data.url.includes('?')
+        ? `${data.url}&supabaseToken=${encodeURIComponent(session.access_token)}`
+        : `${data.url}?supabaseToken=${encodeURIComponent(session.access_token)}`;
+      window.open(urlWithToken, "_blank", "noopener,noreferrer");
     } else {
       let description = "Failed to get OAuth URL. Please try again.";
       if (data.error) {
