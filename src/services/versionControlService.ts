@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 // Strict types for the real GitHub API objects you showed
@@ -180,11 +181,17 @@ export const checkConnectionStatus = async (provider: 'github' | 'gitlab'): Prom
     const tableName = provider === 'github' ? 'user_github_tokens' : 'user_gitlab_tokens';
     const { data, error } = await supabase
       .from(tableName)
-      .select('connected')
-      .eq('connected', true)
-      .single();
+      .select('connected, access_token')
+      .eq('user_id', session.user.id)
+      .maybeSingle(); // Use maybeSingle instead of single to handle no rows
     
-    return !error && data?.connected === true;
+    if (error) {
+      console.error(`Error checking ${provider} connection:`, error);
+      return false;
+    }
+    
+    // Return true only if we have data, connected is true, and access_token exists
+    return !!(data && data.connected && data.access_token);
   } catch (error) {
     console.error(`Error checking ${provider} connection:`, error);
     return false;
@@ -197,12 +204,27 @@ export const disconnectProvider = async (provider: 'github' | 'gitlab'): Promise
     if (!session) return;
 
     const tableName = provider === 'github' ? 'user_github_tokens' : 'user_gitlab_tokens';
+    
     // Set connected to false and null out the access_token to ensure true disconnect
-    await supabase
+    const { error } = await supabase
       .from(tableName)
-      .update({ connected: false, access_token: null, refresh_token: null, scope: null, token_type: null, expires_at: null, updated_at: new Date().toISOString() })
+      .update({ 
+        connected: false, 
+        access_token: null, 
+        refresh_token: null, 
+        scope: null, 
+        token_type: null, 
+        expires_at: null, 
+        updated_at: new Date().toISOString() 
+      })
       .eq('user_id', session.user.id);
+    
+    if (error) {
+      console.error(`Error disconnecting ${provider}:`, error);
+      throw error;
+    }
   } catch (error) {
     console.error(`Error disconnecting ${provider}:`, error);
+    throw error;
   }
 };

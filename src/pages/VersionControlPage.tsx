@@ -83,6 +83,7 @@ export const VersionControlPage = () => {
     handleDisconnect
   } = useVersionControl();
 
+  // Handle OAuth callback parameters
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const status = params.get('status');
@@ -96,22 +97,18 @@ export const VersionControlPage = () => {
           description: `Your ${provider} account has been connected.`,
         });
         
-        // Just refresh the connection status.
-        // The other useEffect will fetch data if needed.
-        const connectionTimer = setTimeout(() => {
+        // Check connections after successful OAuth
+        const timer = setTimeout(() => {
           checkConnections();
-        }, 500);
+        }, 1000);
         
-        // Cleanup function for the connection timer
-        const cleanup = () => clearTimeout(connectionTimer);
-        
-        // The navigation timer is separate
+        // Clean up URL after processing
         const navigateTimer = setTimeout(() => {
           navigate(location.pathname, { replace: true });
         }, 2000);
 
         return () => {
-          cleanup();
+          clearTimeout(timer);
           clearTimeout(navigateTimer);
         };
       } else if (status === 'error') {
@@ -120,18 +117,18 @@ export const VersionControlPage = () => {
           description: message || 'An unknown error occurred.',
           variant: 'destructive',
         });
+        
+        // Clean up URL after error
+        const timer = setTimeout(() => {
+          navigate(location.pathname, { replace: true });
+        }, 2000);
+
+        return () => clearTimeout(timer);
       }
-      
-      // Fallback navigation cleanup for error case
-      const timer = setTimeout(() => {
-        navigate(location.pathname, { replace: true });
-      }, 2000);
-
-      return () => clearTimeout(timer);
     }
-  }, [location, navigate, checkConnections]);
+  }, [location.search, navigate, checkConnections]);
 
-  // Fetch data when tab changes or connection status changes
+  // Fetch data when tab changes and we have a connection but no data
   useEffect(() => {
     if (activeTab === 'github' && githubConnected && githubRepos.length === 0) {
       fetchDataForTab('github');

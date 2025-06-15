@@ -100,14 +100,15 @@ serve(async (req: Request) => {
         return Response.redirect(redirect.href, 302);
       }
 
-      // Save tokens to Supabase via rest API (Supabase edge context)
+      // Save tokens to Supabase via rest API
       const user_id = parseJwt(supaToken).sub;
       if (!user_id) {
         const redirect = new URL(`/version-control?provider=github&status=error&message=NoUserId`, FRONTEND_URL);
         return Response.redirect(redirect.href, 302);
       }
 
-      await fetch(`${APP_URL}/rest/v1/user_github_tokens`, {
+      // Use UPSERT to handle both new connections and reconnections
+      const saveResponse = await fetch(`${APP_URL}/rest/v1/user_github_tokens`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -120,14 +121,22 @@ serve(async (req: Request) => {
           access_token: tokenData.access_token,
           scope: tokenData.scope,
           token_type: tokenData.token_type,
-          connected: true, // ALWAYS set connected true when reconnecting
+          connected: true,
         }),
       });
+
+      if (!saveResponse.ok) {
+        const errorText = await saveResponse.text();
+        console.error("Failed to save GitHub token:", errorText);
+        const redirect = new URL(`/version-control?provider=github&status=error&message=Failed_to_save_token`, FRONTEND_URL);
+        return Response.redirect(redirect.href, 302);
+      }
 
       const redirect = new URL('/version-control?provider=github&status=success', FRONTEND_URL);
       return Response.redirect(redirect.href, 302);
 
     } catch (e) {
+      console.error("GitHub OAuth callback error:", e);
       const redirect = new URL(`/version-control?provider=github&status=error&message=${encodeURIComponent(e.message)}`, FRONTEND_URL);
       return Response.redirect(redirect.href, 302);
     }
