@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface OpenAIResponse {
@@ -160,23 +159,31 @@ Correct any grammar, spacing issues (like "sen tence" to "sentence"), and improv
   }
 };
 
-export const generateClientUpdateWithAI = async (text: string, clientName: string, liveLink: string, isRefresh: boolean = false): Promise<string> => {
+export const generateClientUpdateWithAI = async (
+  text: string,
+  clientName: string,
+  liveLink: string,
+  yourName: string,
+  isRefresh: boolean = false
+): Promise<string> => {
   const API_KEY = await getOpenAIKey();
 
   try {
     const startTime = performance.now();
-    
-    const temperatureValue = isRefresh ? 0.6 : 0.4;
-    const styleVariations = [
-      'Create a professional client update message.',
-      'Create a friendly yet professional client update message.',
-      'Create a detailed and informative client update message.',
-      'Create a concise and clear client update message.'
-    ];
 
-    const selectedStyle = isRefresh 
+    // Prompt style for short, professional, list-structured client updates
+    const styleVariations = [
+      `Write a SHORT, highly professional client update as a numbered list with correct grammar, referencing the following client: {clientName}, and signed off by: {yourName}.${liveLink ? " Include the live link at the end." : ""} Use complete sentences, but keep it concise.`,
+      `Create a BRIEF and PROFESSIONAL project progress update as a bullet list for client: {clientName}. Sign the message as {yourName}. Make it suitable for copying into an email.`
+    ];
+    const selectedStyle = isRefresh
       ? styleVariations[Math.floor(Math.random() * styleVariations.length)]
       : styleVariations[0];
+
+    // Compose the system prompt
+    const systemPrompt = selectedStyle
+      .replace("{clientName}", clientName)
+      .replace("{yourName}", yourName);
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -189,20 +196,19 @@ export const generateClientUpdateWithAI = async (text: string, clientName: strin
         messages: [
           {
             role: 'system',
-            content: `You are a professional client communication specialist. ${selectedStyle} Correct any grammar, spacing issues, and improve sentence structure. Format it professionally for client communication.`
+            content: `${systemPrompt}
+Correct any grammar and spacing issues.`
           },
           {
             role: 'user',
-            content: `Create a professional client update using this information:
-            
-Client: ${clientName}
-Updates: ${text}${liveLink ? `\nLive Link: ${liveLink}` : ''}
+            content: `Here are today's update details:
 
-Please format it professionally${liveLink ? ' and include the live link at the end where clients can check the progress.' : '.'}`
+Updates: ${text}${liveLink ? `\nLive Link: ${liveLink}` : ''}
+            `
           }
         ],
-        temperature: temperatureValue,
-        max_tokens: 600
+        temperature: isRefresh ? 0.6 : 0.4,
+        max_tokens: 400
       }),
     });
 
@@ -213,7 +219,7 @@ Please format it professionally${liveLink ? ' and include the live link at the e
     const data = await response.json();
     const endTime = performance.now();
     console.log(`OpenAI API call took ${endTime - startTime} milliseconds`);
-    
+
     return data.choices[0].message.content;
   } catch (error) {
     console.error('OpenAI API error:', error);

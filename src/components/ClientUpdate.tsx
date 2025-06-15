@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, Send, MessageSquare, RefreshCw, Copy, ExternalLink } from 'lucide-react';
+import { Users, Send, MessageSquare, RefreshCw, Copy, ExternalLink, Mail } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { generateClientUpdateWithAI } from '@/services/openaiService';
 import { Navigation } from '@/components/Navigation';
 import { Layout } from '@/components/Layout';
+import { supabase } from '@/integrations/supabase/client'; // Needed for fetching user profile
 
 interface ClientUpdate {
   id: string;
@@ -27,6 +29,25 @@ export const ClientUpdate = () => {
   const [formattedUpdate, setFormattedUpdate] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [clientUpdates, setClientUpdates] = useState<ClientUpdate[]>([]);
+  const [yourName, setYourName] = useState('Your Name'); // Default placeholder
+
+  // Fetch your name (full_name from profile)
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .maybeSingle();
+        if (data && data.full_name) {
+          setYourName(data.full_name);
+        }
+      }
+    };
+    fetchProfile();
+  }, []);
 
   const processMessage = async (isRefresh: boolean = false) => {
     if (!originalMessage.trim() || !clientName.trim()) {
@@ -39,11 +60,11 @@ export const ClientUpdate = () => {
     }
 
     setIsProcessing(true);
-    
+
     try {
-      const formatted = await generateClientUpdateWithAI(originalMessage, clientName, liveLink, isRefresh);
+      const formatted = await generateClientUpdateWithAI(originalMessage, clientName, liveLink, yourName, isRefresh);
       setFormattedUpdate(formatted);
-      
+
       toast({
         title: "Client Update Generated!",
         description: isRefresh ? "Generated a new variation of your client update." : "Your client update has been corrected and formatted using AI.",
@@ -63,42 +84,13 @@ export const ClientUpdate = () => {
     processMessage(true);
   };
 
-  const shareToWhatsApp = () => {
-    const url = `https://wa.me/?text=${encodeURIComponent(formattedUpdate)}`;
-    window.open(url, '_blank');
-    toast({
-      title: "Shared to WhatsApp!",
-      description: "Update shared to WhatsApp.",
-    });
-  };
-
-  const shareToSlack = () => {
-    const url = `https://slack.com/intl/en-in/help/articles/201330736-Add-apps-to-your-Slack-workspace`;
-    window.open(url, '_blank');
+  // "Send Email" handler (simulate by copying formattedUpdate)
+  const handleSendEmail = () => {
+    if (!formattedUpdate) return;
     navigator.clipboard.writeText(formattedUpdate);
     toast({
-      title: "Copied for Slack!",
-      description: "Update copied to clipboard for Slack sharing.",
-    });
-  };
-
-  const shareToTeams = () => {
-    navigator.clipboard.writeText(formattedUpdate);
-    const url = 'https://teams.microsoft.com/';
-    window.open(url, '_blank');
-    toast({
-      title: "Copied for Teams!",
-      description: "Update copied to clipboard for Teams sharing.",
-    });
-  };
-
-  const shareToUpwork = () => {
-    navigator.clipboard.writeText(formattedUpdate);
-    const url = 'https://www.upwork.com/nx/find-work/best-matches';
-    window.open(url, '_blank');
-    toast({
-      title: "Copied for Upwork!",
-      description: "Update copied to clipboard for Upwork sharing.",
+      title: "Copied to Clipboard!",
+      description: "Client update copied. Paste it into your email client.",
     });
   };
 
@@ -118,7 +110,7 @@ export const ClientUpdate = () => {
     setOriginalMessage('');
     setLiveLink('');
     setFormattedUpdate('');
-    
+
     toast({
       title: "Client Update Sent!",
       description: "Your client update has been sent.",
@@ -160,7 +152,7 @@ export const ClientUpdate = () => {
                 className="border-slate-200 focus:border-blue-500"
               />
             </div>
-            
+
             <div>
               <label className="text-sm font-medium text-slate-700 mb-2 block">
                 Live Link (Optional)
@@ -172,7 +164,7 @@ export const ClientUpdate = () => {
                 className="border-slate-200 focus:border-blue-500"
               />
             </div>
-            
+
             <div>
               <label className="text-sm font-medium text-slate-700 mb-2 block">
                 Update Message
@@ -184,9 +176,9 @@ export const ClientUpdate = () => {
                 className="min-h-32 resize-none border-slate-200 focus:border-blue-500"
               />
             </div>
-            
+
             <div className="flex items-center space-x-2">
-              <Button 
+              <Button
                 onClick={() => processMessage(false)}
                 disabled={isProcessing || !originalMessage.trim() || !clientName.trim()}
                 className="bg-blue-500 hover:bg-blue-600"
@@ -203,8 +195,8 @@ export const ClientUpdate = () => {
                   </>
                 )}
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={handleRefresh}
                 disabled={isProcessing || !originalMessage.trim() || !clientName.trim()}
               >
@@ -230,16 +222,16 @@ export const ClientUpdate = () => {
                 <p className="text-slate-400 italic">AI generated client update will appear here...</p>
               )}
             </div>
-            
+
             {formattedUpdate && (
               <div className="space-y-3">
                 <div className="flex space-x-2">
-                  <Button 
+                  <Button
                     onClick={sendUpdate}
                     className="flex-1 bg-green-500 hover:bg-green-600"
                   >
                     <Send className="w-4 h-4 mr-2" />
-                    Send Update
+                    Save Update
                   </Button>
                   <Button
                     variant="outline"
@@ -248,24 +240,15 @@ export const ClientUpdate = () => {
                   >
                     <Copy className="w-4 h-4" />
                   </Button>
-                </div>
-                
-                <div className="border-t pt-3">
-                  <p className="text-sm font-medium text-slate-700 mb-2">Share to platforms:</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button variant="outline" size="sm" onClick={shareToWhatsApp} className="text-green-600">
-                      WhatsApp
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={shareToSlack} className="text-purple-600">
-                      Slack
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={shareToTeams} className="text-blue-600">
-                      Teams
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={shareToUpwork} className="text-green-700">
-                      Upwork
-                    </Button>
-                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSendEmail}
+                    className="text-blue-600"
+                  >
+                    <Mail className="w-4 h-4" />
+                    Email Send
+                  </Button>
                 </div>
               </div>
             )}
@@ -294,7 +277,7 @@ export const ClientUpdate = () => {
           ) : (
             <div className="space-y-4">
               {clientUpdates.map((update) => (
-                <div 
+                <div
                   key={update.id}
                   className="p-4 border border-slate-200 rounded-lg"
                 >
@@ -303,9 +286,9 @@ export const ClientUpdate = () => {
                       <Users className="w-4 h-4 text-slate-500" />
                       <span className="font-medium text-slate-800">Client: {update.clientName}</span>
                       {update.liveLink && (
-                        <a 
-                          href={update.liveLink} 
-                          target="_blank" 
+                        <a
+                          href={update.liveLink}
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="text-blue-500 hover:text-blue-700"
                         >
@@ -314,7 +297,7 @@ export const ClientUpdate = () => {
                       )}
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Badge 
+                      <Badge
                         variant={update.status === 'sent' ? 'default' : 'secondary'}
                         className={update.status === 'sent' ? 'bg-green-500' : ''}
                       >
@@ -323,7 +306,7 @@ export const ClientUpdate = () => {
                       <span className="text-sm text-slate-500">{update.sentAt}</span>
                     </div>
                   </div>
-                  
+
                   <div className="bg-green-50 p-3 rounded border border-green-200">
                     <p className="text-sm font-medium text-green-700 mb-1">Client Update:</p>
                     <div className="text-green-800 text-sm whitespace-pre-wrap">{update.formattedUpdate}</div>
@@ -337,3 +320,4 @@ export const ClientUpdate = () => {
     </Layout>
   );
 };
+
