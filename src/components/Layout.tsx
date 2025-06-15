@@ -16,10 +16,8 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
             <Sidebar />
           </div>
         )}
-        <main className="flex-1">
-          <div className="container mx-auto px-4 py-8">
-            {children}
-          </div>
+        <main className="flex-1 p-8">
+          {children}
         </main>
       </div>
     </div>
