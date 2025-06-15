@@ -173,7 +173,7 @@ export const ProjectsPage = () => {
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto w-full px-2 md:px-4 space-y-6">
+      <div className="w-full px-2 md:px-4 pt-10">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">Projects</h1>
           <Button onClick={openCreateForm}>
@@ -181,9 +181,7 @@ export const ProjectsPage = () => {
             New Project
           </Button>
         </div>
-
-        {/* Search and Filter */}
-        <div className="flex gap-4 items-center">
+        <div className="flex gap-4 items-center mt-6">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
@@ -207,8 +205,6 @@ export const ProjectsPage = () => {
             </SelectContent>
           </Select>
         </div>
-
-        {/* Projects Grid */}
         {loading ? (
           <div className="text-center py-8">
             <p className="text-gray-500">Loading projects...</p>
@@ -246,8 +242,6 @@ export const ProjectsPage = () => {
             ))}
           </div>
         )}
-
-        {/* Project Form Modal */}
         <ProjectForm
           open={formOpen}
           onOpenChange={setFormOpen}

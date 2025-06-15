@@ -85,7 +85,7 @@ export const TodaysUpdate = () => {
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto w-full px-2 md:px-4">
+      <div className="w-full px-2 md:px-4 pt-10">
         <div className="text-center mb-8">
           <h2 className="text-3xl font-bold text-slate-800 mb-2">Today's Update</h2>
           <p className="text-slate-600">Format your daily updates with AI-powered structure and correction</p>
