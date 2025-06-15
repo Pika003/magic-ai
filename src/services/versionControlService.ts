@@ -63,9 +63,14 @@ export const fetchGitHubRepositories = async (): Promise<GitHubRepository[]> => 
       },
       body: { kind: 'repos' }
     });
-    // Edge Function returns plain array as response (not { data } wrapped)
+
     let repos: GitHubRepository[] = [];
-    if (Array.isArray(response)) {
+    // If response is a string (JSON array), parse it
+    if (typeof response === 'string') {
+      repos = JSON.parse(response);
+    } else if (typeof (response as any)?.data === 'string') {
+      repos = JSON.parse((response as any).data);
+    } else if (Array.isArray(response)) {
       repos = response as GitHubRepository[];
     } else if (Array.isArray((response as any)?.data)) {
       repos = (response as any).data;
@@ -92,9 +97,14 @@ export const fetchGitLabProjects = async (): Promise<GitLabProject[]> => {
       },
       body: { kind: 'projects' }
     });
-    // Edge Function returns plain array as response (not { data } wrapped)
+
     let projects: GitLabProject[] = [];
-    if (Array.isArray(response)) {
+    // If response is a string (JSON array), parse it
+    if (typeof response === 'string') {
+      projects = JSON.parse(response);
+    } else if (typeof (response as any)?.data === 'string') {
+      projects = JSON.parse((response as any).data);
+    } else if (Array.isArray(response)) {
       projects = response as GitLabProject[];
     } else if (Array.isArray((response as any)?.data)) {
       projects = (response as any).data;
