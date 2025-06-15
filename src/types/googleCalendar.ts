@@ -6,6 +6,7 @@ export interface CalendarEvent {
   end: string;
   description?: string;
   location?: string;
+  meetingLink?: string;
 }
 
 export interface GoogleAuthResult {

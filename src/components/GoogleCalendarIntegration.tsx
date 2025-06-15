@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, MapPin, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, MapPin, AlertCircle, Video, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -98,6 +98,14 @@ export const GoogleCalendarIntegration = () => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  const handleJoinMeeting = (meetingLink: string, eventTitle: string) => {
+    window.open(meetingLink, '_blank', 'noopener,noreferrer');
+    toast({
+      title: "Opening Meeting",
+      description: `Joining ${eventTitle}`,
+    });
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -168,6 +176,20 @@ export const GoogleCalendarIntegration = () => {
                               </div>
                             )}
                           </div>
+                          {event.meetingLink && (
+                            <div className="mt-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+                                onClick={() => handleJoinMeeting(event.meetingLink!, event.title)}
+                              >
+                                <Video className="w-3 h-3 mr-1" />
+                                Join Meeting
+                                <ExternalLink className="w-3 h-3 ml-1" />
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

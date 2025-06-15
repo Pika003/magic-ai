@@ -2,6 +2,44 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { CalendarEvent } from '@/types/googleCalendar';
 
+// Helper function to extract meeting link from various sources
+const extractMeetingLink = (event: any): string | undefined => {
+  // Check for Google Meet link in conferenceData
+  if (event.conferenceData?.entryPoints) {
+    const videoEntry = event.conferenceData.entryPoints.find((entry: any) => entry.entryPointType === 'video');
+    if (videoEntry?.uri) {
+      return videoEntry.uri;
+    }
+  }
+
+  // Check for meeting links in description
+  const description = event.description || '';
+  const meetingLinkPatterns = [
+    /https:\/\/meet\.google\.com\/[a-z-]+/i,
+    /https:\/\/zoom\.us\/j\/\d+/i,
+    /https:\/\/teams\.microsoft\.com\/l\/meetup-join\/[^\s]+/i,
+    /https:\/\/[^\s]*\.zoom\.us\/[^\s]*/i,
+  ];
+
+  for (const pattern of meetingLinkPatterns) {
+    const match = description.match(pattern);
+    if (match) {
+      return match[0];
+    }
+  }
+
+  // Check location field for meeting links
+  const location = event.location || '';
+  for (const pattern of meetingLinkPatterns) {
+    const match = location.match(pattern);
+    if (match) {
+      return match[0];
+    }
+  }
+
+  return undefined;
+};
+
 export const getUpcomingEvents = async (userId: string, limit = 3): Promise<CalendarEvent[]> => {
   try {
     console.log('Fetching upcoming events for user:', userId);
@@ -54,7 +92,8 @@ export const getUpcomingEvents = async (userId: string, limit = 3): Promise<Cale
       start: event.start?.dateTime || event.start?.date || '',
       end: event.end?.dateTime || event.end?.date || '',
       description: event.description || '',
-      location: event.location || ''
+      location: event.location || '',
+      meetingLink: extractMeetingLink(event)
     })) || [];
 
     console.log('Processed events:', events);
@@ -116,7 +155,8 @@ export const getTodaysEvents = async (userId: string): Promise<CalendarEvent[]> 
       start: event.start?.dateTime || event.start?.date || '',
       end: event.end?.dateTime || event.end?.date || '',
       description: event.description || '',
-      location: event.location || ''
+      location: event.location || '',
+      meetingLink: extractMeetingLink(event)
     })) || [];
 
     // Cache events in database
