@@ -1,11 +1,14 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, Users, Calendar, Briefcase, GitBranch } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useUsageTracking } from '@/hooks/useUsageTracking';
 
 export const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { isPaidUser } = useUsageTracking();
 
   const sections = [
     {
@@ -36,13 +39,16 @@ export const Sidebar = () => {
       description: 'Manage projects',
       path: '/projects'
     },
-    {
-      id: 'version-control',
-      label: "Version Control",
-      icon: GitBranch,
-      description: "GitHub & GitLab tools",
-      path: '/version-control'
-    }
+    // Only add Version Control if paid
+    ...(isPaidUser ? [
+      {
+        id: 'version-control',
+        label: "Version Control",
+        icon: GitBranch,
+        description: "GitHub & GitLab tools",
+        path: '/version-control'
+      }
+    ] : [])
   ];
 
   return (
