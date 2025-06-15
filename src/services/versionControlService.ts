@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 // Strict types for the real GitHub API objects you showed
@@ -135,68 +136,4 @@ export const checkConnectionStatus = async (provider: 'github' | 'gitlab'): Prom
     console.error(`Error checking ${provider} connection:`, error);
     return false;
   }
-};
-
-/** Get simplified linear commit list for graph:
- * Returns [{ sha, message, author, date, parents: [sha], branch }]
- */
-export const fetchCommitHistory = async ({
-  provider,
-  owner,
-  repo,
-  projectId,
-  branch,
-  per_page = 50
-}: {
-  provider: 'github' | 'gitlab';
-  owner?: string;
-  repo?: string;
-  projectId?: number;
-  branch: string;
-  per_page?: number;
-}) => {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error("Missing session");
-  let response;
-
-  if (provider === 'github' && owner && repo) {
-    response = await supabase.functions.invoke('github-data', {
-      headers: { Authorization: `Bearer ${session.access_token}` },
-      body: { kind: 'commits', owner, repo, branch, per_page }
-    });
-    let arr: any[] = [];
-    if (typeof response === "string") arr = JSON.parse(response);
-    else if (typeof (response as any)?.data === "string") arr = JSON.parse((response as any).data);
-    else if (Array.isArray(response)) arr = response;
-    else if (Array.isArray((response as any)?.data)) arr = (response as any).data;
-
-    return arr.map(c => ({
-      sha: c.sha,
-      message: c.commit?.message || '',
-      author: c.commit?.author?.name || '',
-      date: c.commit?.author?.date || '',
-      parents: (c.parents || []).map((p: any) => p.sha),
-    }));
-  }
-
-  if (provider === 'gitlab' && projectId) {
-    response = await supabase.functions.invoke('gitlab-data', {
-      headers: { Authorization: `Bearer ${session.access_token}` },
-      body: { kind: 'commits', project_id: projectId, branch, per_page }
-    });
-    let arr: any[] = [];
-    if (typeof response === "string") arr = JSON.parse(response);
-    else if (typeof (response as any)?.data === "string") arr = JSON.parse((response as any).data);
-    else if (Array.isArray(response)) arr = response;
-    else if (Array.isArray((response as any)?.data)) arr = (response as any).data;
-
-    return arr.map(c => ({
-      sha: c.id,
-      message: c.title || c.message || '',
-      author: c.author_name || (c.author && c.author.name) || '',
-      date: c.committed_date || c.created_at || '',
-      parents: c.parent_ids || [],
-    }));
-  }
-  return [];
 };

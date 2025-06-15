@@ -1,37 +1,17 @@
+
 import React from "react";
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Github, Copy } from "lucide-react";
-import { BranchDropdown } from "./BranchDropdown";
-import { useRepositoryBranches } from "@/hooks/useRepositoryBranches";
-import { useLatestCommit } from "@/hooks/useLatestCommit";
 import { toast } from "@/hooks/use-toast";
 import type { GitHubRepository } from "@/services/versionControlService";
-import { useState } from "react";
-import { GitGraphModal } from "./GitGraphModal";
 
 interface Props {
   repo: GitHubRepository;
-  branch: string;
-  setBranch: (branch: string) => void;
 }
 
-export const GitHubRepoCard: React.FC<Props> = ({ repo, branch, setBranch }) => {
-  const [showGraph, setShowGraph] = useState(false);
-
-  const { branches, loading: branchLoading, error: branchError } = useRepositoryBranches({
-    provider: "github",
-    owner: repo.owner.login,
-    repo: repo.name,
-  });
-  const { commit, loading: commitLoading } = useLatestCommit({
-    provider: "github",
-    owner: repo.owner.login,
-    repo: repo.name,
-    branch: branch,
-  });
-
+export const GitHubRepoCard: React.FC<Props> = ({ repo }) => {
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
     toast({
@@ -70,30 +50,9 @@ export const GitHubRepoCard: React.FC<Props> = ({ repo, branch, setBranch }) => 
             <span className="font-medium mr-2">Full Name:</span>
             <span>{repo.full_name || "-"}</span>
           </div>
-          {/* Branch Dropdown */}
           <div>
-            <span className="font-medium mr-2">Branch:</span>
-            <BranchDropdown
-              branches={branches}
-              value={branch}
-              onChange={setBranch}
-              loading={branchLoading}
-              error={branchError}
-            />
-          </div>
-          {/* Latest Commit */}
-          <div>
-            <span className="font-medium mr-2">Latest Commit:</span>
-            {commitLoading ? (
-              <span className="italic text-xs">Loading...</span>
-            ) : commit ? (
-              <span>
-                <span className="font-mono">{commit.message.slice(0, 60)}{commit.message.length > 60 ? "..." : ""}</span>
-                <span className="ml-1 text-xs text-slate-400">— {commit.author} ({commit.date ? new Date(commit.date).toLocaleString() : ""})</span>
-              </span>
-            ) : (
-              <span className="italic text-xs">Not available</span>
-            )}
+            <span className="font-medium mr-2">Default Branch:</span>
+            <span>{repo.default_branch || 'main'}</span>
           </div>
           <div>
             <span className="font-medium mr-2">Language:</span>
@@ -133,23 +92,6 @@ export const GitHubRepoCard: React.FC<Props> = ({ repo, branch, setBranch }) => 
             )}
           </div>
         </div>
-        <div className="flex gap-2 mt-2">
-          <button
-            type="button"
-            className="bg-slate-100 hover:bg-slate-200 border text-xs font-semibold rounded px-2 py-1"
-            onClick={() => setShowGraph(true)}
-          >
-            View Git Graph
-          </button>
-        </div>
-        <GitGraphModal
-          isOpen={showGraph}
-          onClose={() => setShowGraph(false)}
-          provider="github"
-          owner={repo.owner.login}
-          repo={repo.name}
-          branch={branch}
-        />
       </CardContent>
     </Card>
   );

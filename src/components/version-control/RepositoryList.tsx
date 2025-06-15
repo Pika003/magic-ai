@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Github, Gitlab, Search, Filter } from 'lucide-react';
+import { Github, Gitlab, Search } from 'lucide-react';
 import { GitHubRepository, GitLabProject } from '@/services/versionControlService';
 import { GitHubRepoCard } from './GitHubRepoCard';
 import { GitLabProjectCard } from './GitLabProjectCard';
@@ -159,11 +159,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                     onClick={() => setModalRepo(repo)}
                     onKeyDown={e => { if (e.key === "Enter") setModalRepo(repo); }}
                   >
-                    <GitHubRepoCard
-                      repo={repo}
-                      branch={repo.default_branch || "main"}
-                      setBranch={() => {}}
-                    />
+                    <GitHubRepoCard repo={repo} />
                   </div>
                 </div>
               ))}
@@ -254,11 +250,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                   onClick={() => setModalRepo(project)}
                   onKeyDown={e => { if (e.key === "Enter") setModalRepo(project); }}
                 >
-                  <GitLabProjectCard
-                    project={project}
-                    branch={project.default_branch || "main"}
-                    setBranch={() => {}}
-                  />
+                  <GitLabProjectCard project={project} />
                 </div>
               </div>
             ))}
