@@ -1,12 +1,10 @@
 
-// deno-lint-ignore-file no-explicit-any
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 const GITLAB_CLIENT_ID = Deno.env.get("GITLAB_CLIENT_ID");
@@ -14,10 +12,17 @@ const GITLAB_CLIENT_SECRET = Deno.env.get("GITLAB_CLIENT_SECRET");
 const APP_URL = Deno.env.get("APP_URL") || "https://wrvobkcgxmemexernxne.supabase.co";
 const FRONTEND_URL = "https://preview--sentence-scribe-ai-magic.lovable.app";
 
+function parseJwt(token: string) {
+  const base64Url = token.split('.')[1];
+  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+  const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+  }).join(''));
+  return JSON.parse(jsonPayload);
+}
 
 serve(async (req: Request) => {
-  if (req.method === "OPTIONS")
-    return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   const url = new URL(req.url);
   const path_parts = url.pathname.split("/");
@@ -26,20 +31,18 @@ serve(async (req: Request) => {
   if (action === "start") {
     const redirectUri = `${APP_URL}/functions/v1/gitlab-oauth/callback`;
     const gitlabUrl = `https://gitlab.com/oauth/authorize?client_id=${GITLAB_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=read_user+api`;
-    return new Response(
-      JSON.stringify({ url: gitlabUrl }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ url: gitlabUrl }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
   if (action === "callback") {
     try {
       const code = url.searchParams.get('code');
-      if (!code) {
-        const redirect = new URL('/version-control?provider=gitlab&status=error&message=Missing_authorization_code', FRONTEND_URL);
+      const supaToken = url.searchParams.get('supabaseToken');
+      if (!code || !supaToken) {
+        const msg = !code ? "Missing_authorization_code" : "Missing_Supabase_token";
+        const redirect = new URL(`/version-control?provider=gitlab&status=error&message=${msg}`, FRONTEND_URL);
         return Response.redirect(redirect.href, 302);
       }
-
       const tokenResp = await fetch("https://gitlab.com/oauth/token", {
         method: "POST",
         headers: {
@@ -60,6 +63,28 @@ serve(async (req: Request) => {
         const redirect = new URL(`/version-control?provider=gitlab&status=error&message=${message}`, FRONTEND_URL);
         return Response.redirect(redirect.href, 302);
       }
+
+      // Save tokens to Supabase via rest API (Supabase edge context)
+      const user_id = parseJwt(supaToken).sub;
+      if (!user_id) {
+        const redirect = new URL(`/version-control?provider=gitlab&status=error&message=NoUserId`, FRONTEND_URL);
+        return Response.redirect(redirect.href, 302);
+      }
+      await fetch(`${APP_URL}/rest/v1/user_gitlab_tokens`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": Deno.env.get("SUPABASE_ANON_KEY")!,
+          "Authorization": `Bearer ${supaToken}`,
+          "Prefer": "resolution=merge-duplicates",
+        },
+        body: JSON.stringify({
+          user_id,
+          access_token: tokenData.access_token,
+          scope: (tokenData.scope ?? "read_user api"),
+          token_type: tokenData.token_type ?? "bearer",
+        }),
+      });
 
       const redirect = new URL('/version-control?provider=gitlab&status=success', FRONTEND_URL);
       return Response.redirect(redirect.href, 302);

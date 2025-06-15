@@ -1,3 +1,4 @@
+
 project_id = "wrvobkcgxmemexernxne"
 
 [functions.github-oauth]
@@ -8,3 +9,9 @@ verify_jwt = false
 
 [functions.stripe-webhook-unlock]
 verify_jwt = false
+
+[functions.github-data]
+verify_jwt = true
+
+[functions.gitlab-data]
+verify_jwt = true
