@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -75,6 +76,20 @@ serve(async (req: Request) => {
 
       const supaToken = decodeURIComponent(state);
 
+      // Parse and validate the JWT token
+      let userId;
+      try {
+        const parsedToken = parseJwt(supaToken);
+        userId = parsedToken.sub;
+        if (!userId) {
+          throw new Error("No user ID in token");
+        }
+      } catch (e) {
+        console.error("Failed to parse JWT token:", e);
+        const redirect = new URL(`/version-control?provider=gitlab&status=error&message=Invalid_token`, FRONTEND_URL);
+        return Response.redirect(redirect.href, 302);
+      }
+
       const tokenResp = await fetch("https://gitlab.com/oauth/token", {
         method: "POST",
         headers: {
@@ -97,29 +112,34 @@ serve(async (req: Request) => {
         return Response.redirect(redirect.href, 302);
       }
 
-      // Save tokens to Supabase via rest API
-      const user_id = parseJwt(supaToken).sub;
-      if (!user_id) {
-        const redirect = new URL(`/version-control?provider=gitlab&status=error&message=NoUserId`, FRONTEND_URL);
+      // Validate that we got an access token
+      if (!tokenData.access_token) {
+        console.error("No access token received from GitLab:", tokenData);
+        const redirect = new URL(`/version-control?provider=gitlab&status=error&message=No_access_token_received`, FRONTEND_URL);
         return Response.redirect(redirect.href, 302);
       }
 
+      // Prepare the data object, ensuring required fields are present
       const postData: any = {
-        user_id,
+        user_id: userId,
         access_token: tokenData.access_token,
         scope: tokenData.scope ?? "read_user api",
         token_type: tokenData.token_type ?? "bearer",
         connected: true,
         updated_at: new Date().toISOString(),
       };
+      
       if (tokenData.refresh_token) {
         postData.refresh_token = tokenData.refresh_token;
       }
+      
       if (tokenData.expires_in && !isNaN(Number(tokenData.expires_in))) {
         // GitLab usually does send expires_in
         const expiresAt = new Date(Date.now() + Number(tokenData.expires_in) * 1000).toISOString();
         postData.expires_at = expiresAt;
       }
+
+      console.log("Attempting to save GitLab token for user:", userId);
 
       // Use UPSERT to handle both new connections and reconnections
       const saveResponse = await fetch(`${APP_URL}/rest/v1/user_gitlab_tokens`, {
@@ -136,10 +156,13 @@ serve(async (req: Request) => {
       if (!saveResponse.ok) {
         const errorText = await saveResponse.text();
         console.error("Failed to save GitLab token:", errorText);
+        console.error("Response status:", saveResponse.status);
+        console.error("Post data:", JSON.stringify(postData, null, 2));
         const redirect = new URL(`/version-control?provider=gitlab&status=error&message=Failed_to_save_token`, FRONTEND_URL);
         return Response.redirect(redirect.href, 302);
       }
 
+      console.log("Successfully saved GitLab token for user:", userId);
       const redirect = new URL('/version-control?provider=gitlab&status=success', FRONTEND_URL);
       return Response.redirect(redirect.href, 302);
 
