@@ -9,6 +9,56 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_dismissed: boolean
+          is_read: boolean
+          message: string
+          project_id: string | null
+          scheduled_for: string | null
+          title: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_dismissed?: boolean
+          is_read?: boolean
+          message: string
+          project_id?: string | null
+          scheduled_for?: string | null
+          title: string
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_dismissed?: boolean
+          is_read?: boolean
+          message?: string
+          project_id?: string | null
+          scheduled_for?: string | null
+          title?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -33,6 +83,48 @@ export type Database = {
           id?: string
           updated_at?: string
           username?: string | null
+        }
+        Relationships: []
+      }
+      projects: {
+        Row: {
+          client_email: string | null
+          client_name: string | null
+          created_at: string
+          description: string | null
+          id: string
+          last_update_sent: string | null
+          name: string
+          status: string
+          update_frequency_days: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_email?: string | null
+          client_name?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          last_update_sent?: string | null
+          name: string
+          status?: string
+          update_frequency_days?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_email?: string | null
+          client_name?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          last_update_sent?: string | null
+          name?: string
+          status?: string
+          update_frequency_days?: number | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -137,7 +229,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_project_update_notifications: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

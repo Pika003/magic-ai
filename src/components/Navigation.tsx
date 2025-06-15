@@ -1,10 +1,11 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Users, Calendar, User, LogOut } from 'lucide-react';
+import { CheckCircle, Users, Calendar, User, LogOut, Briefcase } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
+import { NotificationBell } from './NotificationBell';
 
 export const Navigation = () => {
   const { user, signOut } = useAuth();
@@ -32,6 +33,13 @@ export const Navigation = () => {
       icon: Calendar,
       description: 'Daily updates',
       path: '/todays-update'
+    },
+    {
+      id: 'projects',
+      label: "Projects",
+      icon: Briefcase,
+      description: 'Manage projects',
+      path: '/projects'
     }
   ];
 
@@ -94,6 +102,10 @@ export const Navigation = () => {
                     </Button>
                   );
                 })}
+
+                <div className="h-6 border-l border-slate-200 mx-2"></div>
+                
+                <NotificationBell />
                 
                 <Button
                   variant="ghost"

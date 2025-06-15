@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 const GOOGLE_CLIENT_ID = "591673388194-dlu3uddopek8k1f0br2cnif46ohn6jiu.apps.googleusercontent.com";
@@ -179,6 +178,35 @@ export const getTodaysEvents = async (userId: string): Promise<CalendarEvent[]> 
       await supabase
         .from('user_calendar_events')
         .upsert(eventData);
+
+      const notificationsData = events.map(event => ({
+        user_id: userId,
+        type: 'meeting' as const,
+        title: `${event.title}`,
+        message: `Today at ${new Date(event.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+        scheduled_for: event.start,
+      }));
+
+      // delete old meeting notifications for today to avoid duplicates
+      const { error: deleteError } = await supabase
+          .from('notifications')
+          .delete()
+          .eq('user_id', userId)
+          .eq('type', 'meeting')
+          .gte('scheduled_for', startOfDay.toISOString())
+          .lte('scheduled_for', endOfDay.toISOString());
+
+      if (deleteError) {
+          console.error('Error deleting old meeting notifications:', deleteError);
+      }
+      
+      const { error: notificationError } = await supabase
+          .from('notifications')
+          .insert(notificationsData);
+
+      if (notificationError) {
+          console.error('Error creating meeting notifications:', notificationError);
+      }
     }
 
     return events;
@@ -208,4 +236,45 @@ export const checkGoogleCalendarConnection = async (userId: string): Promise<boo
     console.error('Error checking Google Calendar connection:', error);
     return false;
   }
+};
+
+export const getNotifications = async (userId: string) => {
+    const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_dismissed', false)
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching notifications:', error);
+        return [];
+    }
+    return data || [];
+};
+
+export const dismissNotification = async (notificationId: string) => {
+    const { error } = await supabase
+        .from('notifications')
+        .update({ is_dismissed: true, is_read: true })
+        .eq('id', notificationId);
+
+    if (error) {
+        console.error('Error dismissing notification:', error);
+        return false;
+    }
+    return true;
+};
+
+export const markNotificationAsRead = async (notificationId: string) => {
+    const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId);
+
+    if (error) {
+        console.error('Error marking notification as read:', error);
+        return false;
+    }
+    return true;
 };
