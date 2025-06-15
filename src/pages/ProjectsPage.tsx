@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
@@ -174,7 +173,7 @@ export const ProjectsPage = () => {
 
   return (
     <Layout>
-      <div className="space-y-6">
+      <div className="max-w-7xl mx-auto w-full px-2 md:px-4 space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">Projects</h1>
           <Button onClick={openCreateForm}>
