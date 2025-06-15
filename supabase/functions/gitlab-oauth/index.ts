@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -119,7 +118,18 @@ serve(async (req: Request) => {
         return Response.redirect(redirect.href, 302);
       }
 
-      // Prepare the data object, ensuring required fields are present
+      console.log("Attempting to save GitLab token for user:", userId);
+
+      // First, delete any existing token record to start fresh
+      await fetch(`${APP_URL}/rest/v1/user_gitlab_tokens?user_id=eq.${userId}`, {
+        method: "DELETE",
+        headers: {
+          "apikey": Deno.env.get("SUPABASE_ANON_KEY")!,
+          "Authorization": `Bearer ${supaToken}`,
+        },
+      });
+
+      // Prepare the data object for the new token record
       const postData: any = {
         user_id: userId,
         access_token: tokenData.access_token,
@@ -134,21 +144,17 @@ serve(async (req: Request) => {
       }
       
       if (tokenData.expires_in && !isNaN(Number(tokenData.expires_in))) {
-        // GitLab usually does send expires_in
         const expiresAt = new Date(Date.now() + Number(tokenData.expires_in) * 1000).toISOString();
         postData.expires_at = expiresAt;
       }
 
-      console.log("Attempting to save GitLab token for user:", userId);
-
-      // Use UPSERT to handle both new connections and reconnections
+      // Insert the new token record
       const saveResponse = await fetch(`${APP_URL}/rest/v1/user_gitlab_tokens`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "apikey": Deno.env.get("SUPABASE_ANON_KEY")!,
           "Authorization": `Bearer ${supaToken}`,
-          "Prefer": "resolution=merge-duplicates",
         },
         body: JSON.stringify(postData),
       });

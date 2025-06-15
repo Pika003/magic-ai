@@ -121,7 +121,18 @@ serve(async (req: Request) => {
         return Response.redirect(redirect.href, 302);
       }
 
-      // Prepare the data object, ensuring required fields are present
+      console.log("Attempting to save GitHub token for user:", userId);
+
+      // First, delete any existing token record to start fresh
+      await fetch(`${APP_URL}/rest/v1/user_github_tokens?user_id=eq.${userId}`, {
+        method: "DELETE",
+        headers: {
+          "apikey": Deno.env.get("SUPABASE_ANON_KEY")!,
+          "Authorization": `Bearer ${supaToken}`,
+        },
+      });
+
+      // Prepare the data object for the new token record
       const postData: any = {
         user_id: userId,
         access_token: tokenData.access_token,
@@ -136,21 +147,17 @@ serve(async (req: Request) => {
       }
       
       if (tokenData.expires_in && !isNaN(Number(tokenData.expires_in))) {
-        // GitHub typically doesn't send expires_in, but just in case
         const expiresAt = new Date(Date.now() + Number(tokenData.expires_in) * 1000).toISOString();
         postData.expires_at = expiresAt;
       }
 
-      console.log("Attempting to save GitHub token for user:", userId);
-
-      // Use UPSERT to handle both new connections and reconnections
+      // Insert the new token record
       const saveResponse = await fetch(`${APP_URL}/rest/v1/user_github_tokens`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "apikey": Deno.env.get("SUPABASE_ANON_KEY")!,
           "Authorization": `Bearer ${supaToken}`,
-          "Prefer": "resolution=merge-duplicates",
         },
         body: JSON.stringify(postData),
       });

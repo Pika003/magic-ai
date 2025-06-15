@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 // Strict types for the real GitHub API objects you showed
@@ -54,15 +53,15 @@ export interface GitLabProject {
 }
 
 const handleTokenExpiration = async (provider: 'github' | 'gitlab') => {
-  console.log(`Token expired for ${provider}, marking as disconnected`);
+  console.log(`Token expired for ${provider}, deleting token record`);
   
-  // Mark token as disconnected in database
+  // Delete the token record entirely from database
   const { data: { session } } = await supabase.auth.getSession();
   if (session) {
     const tableName = provider === 'github' ? 'user_github_tokens' : 'user_gitlab_tokens';
     await supabase
       .from(tableName)
-      .update({ connected: false })
+      .delete()
       .eq('user_id', session.user.id);
   }
 };
@@ -205,18 +204,10 @@ export const disconnectProvider = async (provider: 'github' | 'gitlab'): Promise
 
     const tableName = provider === 'github' ? 'user_github_tokens' : 'user_gitlab_tokens';
     
-    // Set connected to false and null out the access_token to ensure true disconnect
+    // Delete the entire row instead of updating it
     const { error } = await supabase
       .from(tableName)
-      .update({ 
-        connected: false, 
-        access_token: null, 
-        refresh_token: null, 
-        scope: null, 
-        token_type: null, 
-        expires_at: null, 
-        updated_at: new Date().toISOString() 
-      })
+      .delete()
       .eq('user_id', session.user.id);
     
     if (error) {
