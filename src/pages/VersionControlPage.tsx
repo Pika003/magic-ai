@@ -51,9 +51,13 @@ const handleOAuthStart = async (provider: 'github' | 'gitlab') => {
     if (data.url) {
       window.location.href = data.url;
     } else {
+      let description = "Failed to get OAuth URL. Please try again.";
+      if (data.error) {
+        description = data.path ? `${data.error} (Path: ${data.path})` : data.error;
+      }
       toast({
         title: "OAuth Error",
-        description: "Failed to get OAuth URL. Please try again.",
+        description: description,
         variant: "destructive"
       });
     }

@@ -18,8 +18,10 @@ serve(async (req: Request) => {
     return new Response(null, { headers: corsHeaders });
 
   const url = new URL(req.url);
+  const path_parts = url.pathname.split("/");
+  const action = path_parts[path_parts.length - 1] || path_parts[path_parts.length - 2];
 
-  if (url.pathname.endsWith("/start")) {
+  if (action === "start") {
     const redirectUri = `${APP_URL}/functions/v1/gitlab-oauth/callback`;
     const gitlabUrl = `https://gitlab.com/oauth/authorize?client_id=${GITLAB_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=read_user+api`;
     return new Response(
@@ -28,7 +30,7 @@ serve(async (req: Request) => {
     );
   }
 
-  if (url.pathname.endsWith("/callback") && req.method === "POST") {
+  if (action === "callback" && req.method === "POST") {
     try {
       const { code } = await req.json();
       if (!code)
@@ -62,5 +64,5 @@ serve(async (req: Request) => {
     }
   }
 
-  return new Response(JSON.stringify({ error: "Invalid endpoint" }), { status: 400, headers: corsHeaders });
+  return new Response(JSON.stringify({ error: "Invalid endpoint", path: url.pathname }), { status: 400, headers: corsHeaders });
 });
