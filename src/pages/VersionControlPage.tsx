@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -52,15 +53,18 @@ const handleOAuthStart = async (provider: 'github' | 'gitlab') => {
 };
 
 export const VersionControlPage = () => (
-  <div className="max-w-4xl mx-auto py-8 flex flex-col gap-8">
-    <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
-      <GitBranch className="w-7 h-7 text-blue-500" />
-      Version Control Management
-    </h1>
-    <p className="text-muted-foreground mb-6">
-      Manage your GitHub and GitLab repositories, branches, commits, and utilize AI-powered features.
-    </p>
-    <div className="flex gap-4 mb-4">
+  <div className="w-full h-full">
+    <div className="mb-6">
+      <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
+        <GitBranch className="w-7 h-7 text-blue-500" />
+        Version Control Management
+      </h1>
+      <p className="text-muted-foreground">
+        Manage your GitHub and GitLab repositories, branches, commits, and utilize AI-powered features.
+      </p>
+    </div>
+    
+    <div className="flex gap-4 mb-6">
       <button
         onClick={() => handleOAuthStart("github")}
         className="bg-black text-white px-4 py-2 rounded shadow flex items-center gap-2 hover:bg-gray-900"
@@ -76,8 +80,9 @@ export const VersionControlPage = () => (
         Connect GitLab
       </button>
     </div>
+    
     <Tabs defaultValue="github" className="w-full">
-      <TabsList className="mb-4">
+      <TabsList className="mb-6">
         <TabsTrigger value="github" className="flex items-center gap-2">
           <Github className="w-5 h-5" /> GitHub
         </TabsTrigger>
@@ -95,7 +100,6 @@ export const VersionControlPage = () => (
               </CardHeader>
               <CardContent>
                 <CardDescription>{section.desc}</CardDescription>
-                {/* Placeholder for future controls */}
                 <div className="text-xs text-slate-400 mt-2">Coming soon...</div>
               </CardContent>
             </Card>
@@ -112,7 +116,6 @@ export const VersionControlPage = () => (
               </CardHeader>
               <CardContent>
                 <CardDescription>{section.desc}</CardDescription>
-                {/* Placeholder for future controls */}
                 <div className="text-xs text-slate-400 mt-2">Coming soon...</div>
               </CardContent>
             </Card>
