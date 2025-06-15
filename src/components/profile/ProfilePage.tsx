@@ -139,82 +139,80 @@ export const ProfilePage = () => {
           <p className="text-slate-600">Manage your account and integrations</p>
         </div>
         
-        {/* Profile Info & Usage Stats Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          <div className="lg:col-span-2">
-            <Card className="h-full">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <User className="w-5 h-5 text-blue-500" />
-                  <span>Profile Information</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={updateProfile} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={user?.email || ''}
-                      disabled
-                      className="bg-slate-50"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="fullName">Full Name</Label>
-                    <Input
-                      id="fullName"
-                      type="text"
-                      placeholder="Enter your full name"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="username">Username</Label>
-                    <Input
-                      id="username"
-                      type="text"
-                      placeholder="Choose a username"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                    />
-                  </div>
-                  <Button type="submit" disabled={saving} className="w-full">
-                    {saving ? (
-                      "Saving..."
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4 mr-2" />
-                        Save Profile
-                      </>
-                    )}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          </div>
-          
-          <div className="flex items-stretch">
-            <UsageStatsCard />
-          </div>
-        </div>
-        
-        {/* Integrations */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <GoogleCalendarIntegration />
-          </Card>
-        </div>
-        
         {isPaidUser && (
-          <div className="mb-8">
+          <div className="mb-6">
             <div className="p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg font-semibold text-center">
               You have unlimited usage unlocked! 🎉
             </div>
           </div>
         )}
+
+        {/* Three sections in one row */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Profile Information */}
+          <Card className="h-fit">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <User className="w-5 h-5 text-blue-500" />
+                <span>Profile Information</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={updateProfile} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={user?.email || ''}
+                    disabled
+                    className="bg-slate-50"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="fullName">Full Name</Label>
+                  <Input
+                    id="fullName"
+                    type="text"
+                    placeholder="Enter your full name"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="username">Username</Label>
+                  <Input
+                    id="username"
+                    type="text"
+                    placeholder="Choose a username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                  />
+                </div>
+                <Button type="submit" disabled={saving} className="w-full">
+                  {saving ? (
+                    "Saving..."
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Profile
+                    </>
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          {/* Usage Statistics */}
+          <div className="h-fit">
+            <UsageStatsCard />
+          </div>
+
+          {/* Google Calendar Integration */}
+          <div className="h-fit">
+            <GoogleCalendarIntegration />
+          </div>
+        </div>
       </div>
     </div>
   );
