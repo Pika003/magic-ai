@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,6 +15,7 @@ import { TodaysUpdate } from "./components/TodaysUpdate";
 import NotFound from "./pages/NotFound";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import VersionControlPage from "./pages/VersionControlPage";
+import { Layout } from "@/components/Layout";
 
 const queryClient = new QueryClient();
 
@@ -27,11 +29,14 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<AuthPage />} />
+            {/* Protected pages are now always rendered WITH the Layout, so the header/sidebar show */}
             <Route 
               path="/correct-sentence" 
               element={
                 <ProtectedRoute>
-                  <CorrectSentence />
+                  <Layout>
+                    <CorrectSentence />
+                  </Layout>
                 </ProtectedRoute>
               } 
             />
@@ -39,7 +44,9 @@ const App = () => (
               path="/client-update" 
               element={
                 <ProtectedRoute>
-                  <ClientUpdate />
+                  <Layout>
+                    <ClientUpdate />
+                  </Layout>
                 </ProtectedRoute>
               } 
             />
@@ -47,7 +54,9 @@ const App = () => (
               path="/todays-update" 
               element={
                 <ProtectedRoute>
-                  <TodaysUpdate />
+                  <Layout>
+                    <TodaysUpdate />
+                  </Layout>
                 </ProtectedRoute>
               } 
             />
@@ -55,7 +64,9 @@ const App = () => (
               path="/profile" 
               element={
                 <ProtectedRoute>
-                  <ProfilePage />
+                  <Layout>
+                    <ProfilePage />
+                  </Layout>
                 </ProtectedRoute>
               } 
             />
@@ -63,7 +74,9 @@ const App = () => (
               path="/projects" 
               element={
                 <ProtectedRoute>
-                  <ProjectsPage />
+                  <Layout>
+                    <ProjectsPage />
+                  </Layout>
                 </ProtectedRoute>
               } 
             />
@@ -71,7 +84,9 @@ const App = () => (
               path="/version-control"
               element={
                 <ProtectedRoute>
-                  <VersionControlPage />
+                  <Layout>
+                    <VersionControlPage />
+                  </Layout>
                 </ProtectedRoute>
               } 
             />
@@ -84,3 +99,4 @@ const App = () => (
 );
 
 export default App;
+
