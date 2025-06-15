@@ -59,7 +59,10 @@ export const initializeGoogleAPI = async (): Promise<void> => {
 export const authenticateGoogleCalendar = async (userId: string): Promise<{ success: boolean; error?: string }> => {
   return new Promise((resolve) => {
     try {
+      console.log('Starting Google Calendar authentication for user:', userId);
+      
       if (!window.google?.accounts?.oauth2) {
+        console.error('Google Identity Services not loaded');
         resolve({ success: false, error: 'Google Identity Services not loaded' });
         return;
       }
@@ -68,7 +71,10 @@ export const authenticateGoogleCalendar = async (userId: string): Promise<{ succ
         client_id: GOOGLE_CLIENT_ID,
         scope: GOOGLE_SCOPES,
         callback: async (tokenResponse: any) => {
+          console.log('Token response received:', tokenResponse);
+          
           if (tokenResponse.error) {
+            console.error('Token response error:', tokenResponse.error);
             resolve({ success: false, error: tokenResponse.error });
             return;
           }
@@ -76,23 +82,32 @@ export const authenticateGoogleCalendar = async (userId: string): Promise<{ succ
           try {
             // Calculate expires_at (token typically expires in 1 hour)
             const expiresAt = new Date(Date.now() + (tokenResponse.expires_in * 1000));
+            
+            console.log('Attempting to store tokens in database...');
+            console.log('User ID:', userId);
+            console.log('Expires at:', expiresAt.toISOString());
 
-            // Store tokens in database
-            const { error } = await supabase
+            // Store tokens in database with nullable refresh_token
+            const { data, error } = await supabase
               .from('user_google_tokens')
               .upsert({
                 user_id: userId,
                 access_token: tokenResponse.access_token,
-                refresh_token: '', // OAuth2 flow doesn't provide refresh token in this context
+                refresh_token: null, // Set to null since OAuth2 flow doesn't provide it
                 expires_at: expiresAt.toISOString()
+              }, {
+                onConflict: 'user_id'
               });
 
+            console.log('Supabase upsert result:', { data, error });
+
             if (error) {
-              console.error('Error storing tokens:', error);
-              resolve({ success: false, error: 'Failed to store authentication tokens' });
+              console.error('Supabase error details:', error);
+              resolve({ success: false, error: `Database error: ${error.message}` });
               return;
             }
 
+            console.log('Tokens stored successfully');
             resolve({ success: true });
           } catch (error) {
             console.error('Error processing token:', error);
@@ -101,6 +116,7 @@ export const authenticateGoogleCalendar = async (userId: string): Promise<{ succ
         },
       });
 
+      console.log('Requesting access token...');
       tokenClient.requestAccessToken();
     } catch (error) {
       console.error('Google Calendar authentication error:', error);
@@ -114,6 +130,8 @@ export const authenticateGoogleCalendar = async (userId: string): Promise<{ succ
  */
 export const getUpcomingEvents = async (userId: string, limit = 3): Promise<CalendarEvent[]> => {
   try {
+    console.log('Fetching upcoming events for user:', userId);
+    
     // Get stored tokens
     const { data: tokenData, error: tokenError } = await supabase
       .from('user_google_tokens')
@@ -122,9 +140,11 @@ export const getUpcomingEvents = async (userId: string, limit = 3): Promise<Cale
       .maybeSingle();
 
     if (tokenError || !tokenData) {
-      console.error('No Google tokens found');
+      console.error('No Google tokens found:', tokenError);
       return [];
     }
+
+    console.log('Token data retrieved:', { expires_at: tokenData.expires_at });
 
     // Check if token is expired
     const now = new Date();
@@ -140,6 +160,8 @@ export const getUpcomingEvents = async (userId: string, limit = 3): Promise<Cale
       access_token: tokenData.access_token
     });
 
+    console.log('Making calendar API request...');
+
     // TimeMin is now; fetch upcoming
     const response = await window.gapi.client.calendar.events.list({
       calendarId: 'primary',
@@ -148,7 +170,9 @@ export const getUpcomingEvents = async (userId: string, limit = 3): Promise<Cale
       showDeleted: false,
       singleEvents: true,
       orderBy: 'startTime'
-    } as any); // <-- casting as any to bypass the typing
+    } as any);
+
+    console.log('Calendar API response:', response);
 
     const events: CalendarEvent[] = response.result.items?.map((event: any) => ({
       id: event.id,
@@ -159,6 +183,7 @@ export const getUpcomingEvents = async (userId: string, limit = 3): Promise<Cale
       location: event.location || ''
     })) || [];
 
+    console.log('Processed events:', events);
     return events;
   } catch (error) {
     console.error('Error fetching calendar events:', error);
@@ -209,7 +234,7 @@ export const getTodaysEvents = async (userId: string): Promise<CalendarEvent[]> 
       showDeleted: false,
       singleEvents: true,
       orderBy: 'startTime'
-    } as any); // <-- casting as any here as well
+    } as any);
 
     const events: CalendarEvent[] = response.result.items?.map((event: any) => ({
       id: event.id,
