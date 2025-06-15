@@ -4,6 +4,7 @@ import {
   fetchGitHubRepositories,
   fetchGitLabProjects,
   checkConnectionStatus,
+  disconnectProvider,
   GitHubRepository,
   GitLabProject
 } from '@/services/versionControlService';
@@ -41,12 +42,30 @@ export const useVersionControl = () => {
       if (status) {
         const data = await fetchGitHubRepositories();
         setGithubRepos(data);
+        
+        // If we got empty data, it might be due to expired token
+        if (data.length === 0) {
+          const newStatus = await checkConnectionStatus('github');
+          setGithubConnected(newStatus);
+          if (!newStatus) {
+            toast({
+              title: "GitHub Token Expired",
+              description: "Please reconnect your GitHub account to continue accessing repositories.",
+              variant: "destructive",
+            });
+          }
+        }
       } else {
         setGithubRepos([]);
       }
     } catch (e) {
+      console.error("GitHub fetch error:", e);
       setError("Failed to fetch GitHub repositories.");
       setGithubRepos([]);
+      
+      // Check if connection is still valid after error
+      const status = await checkConnectionStatus('github');
+      setGithubConnected(status);
     } finally {
       setLoading(false);
     }
@@ -61,12 +80,30 @@ export const useVersionControl = () => {
       if (status) {
         const data = await fetchGitLabProjects();
         setGitlabProjects(data);
+        
+        // If we got empty data, it might be due to expired token
+        if (data.length === 0) {
+          const newStatus = await checkConnectionStatus('gitlab');
+          setGitlabConnected(newStatus);
+          if (!newStatus) {
+            toast({
+              title: "GitLab Token Expired",
+              description: "Please reconnect your GitLab account to continue accessing projects.",
+              variant: "destructive",
+            });
+          }
+        }
       } else {
         setGitlabProjects([]);
       }
     } catch (e) {
+      console.error("GitLab fetch error:", e);
       setError("Failed to fetch GitLab projects.");
       setGitlabProjects([]);
+      
+      // Check if connection is still valid after error
+      const status = await checkConnectionStatus('gitlab');
+      setGitlabConnected(status);
     } finally {
       setLoading(false);
     }
@@ -94,6 +131,30 @@ export const useVersionControl = () => {
     });
   };
 
+  // Disconnect a provider
+  const handleDisconnect = async (provider: 'github' | 'gitlab') => {
+    try {
+      await disconnectProvider(provider);
+      if (provider === 'github') {
+        setGithubConnected(false);
+        setGithubRepos([]);
+      } else {
+        setGitlabConnected(false);
+        setGitlabProjects([]);
+      }
+      toast({
+        title: `${provider === 'github' ? 'GitHub' : 'GitLab'} Disconnected`,
+        description: "You can reconnect anytime to access your repositories.",
+      });
+    } catch (error) {
+      toast({
+        title: "Disconnect Failed",
+        description: `Failed to disconnect ${provider === 'github' ? 'GitHub' : 'GitLab'}. Please try again.`,
+        variant: "destructive",
+      });
+    }
+  };
+
   // By default: initialize both
   useEffect(() => {
     (async () => {
@@ -113,5 +174,6 @@ export const useVersionControl = () => {
     refreshData,
     fetchDataForTab,
     checkConnections,
+    handleDisconnect,
   };
 };

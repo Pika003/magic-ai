@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { GitBranch, Github, Gitlab, Plus } from "lucide-react";
+import { GitBranch, Github, Gitlab, Plus, Unlink } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useVersionControl } from "@/hooks/useVersionControl";
@@ -78,7 +78,8 @@ export const VersionControlPage = () => {
     githubConnected,
     gitlabConnected,
     loading,
-    refreshData
+    refreshData,
+    handleDisconnect
   } = useVersionControl();
 
   useEffect(() => {
@@ -134,22 +135,49 @@ export const VersionControlPage = () => {
       </div>
       
       <div className="flex gap-4 mb-6">
-        <Button
-          onClick={() => handleOAuthStart("github")}
-          className="bg-black text-white px-4 py-2 rounded shadow flex items-center gap-2 hover:bg-gray-900"
-          disabled={githubConnected}
-        >
-          <Github className="w-5 h-5" />
-          {githubConnected ? 'GitHub Connected' : 'Connect GitHub'}
-        </Button>
-        <Button
-          onClick={() => handleOAuthStart("gitlab")}
-          className="bg-[#fca326] text-white px-4 py-2 rounded shadow flex items-center gap-2 hover:bg-[#e09b1f]"
-          disabled={gitlabConnected}
-        >
-          <Gitlab className="w-5 h-5" />
-          {gitlabConnected ? 'GitLab Connected' : 'Connect GitLab'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => handleOAuthStart("github")}
+            className="bg-black text-white px-4 py-2 rounded shadow flex items-center gap-2 hover:bg-gray-900"
+            disabled={githubConnected}
+          >
+            <Github className="w-5 h-5" />
+            {githubConnected ? 'GitHub Connected' : 'Connect GitHub'}
+          </Button>
+          {githubConnected && (
+            <Button
+              onClick={() => handleDisconnect("github")}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <Unlink className="w-4 h-4" />
+              Disconnect
+            </Button>
+          )}
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => handleOAuthStart("gitlab")}
+            className="bg-[#fca326] text-white px-4 py-2 rounded shadow flex items-center gap-2 hover:bg-[#e09b1f]"
+            disabled={gitlabConnected}
+          >
+            <Gitlab className="w-5 h-5" />
+            {gitlabConnected ? 'GitLab Connected' : 'Connect GitLab'}
+          </Button>
+          {gitlabConnected && (
+            <Button
+              onClick={() => handleDisconnect("gitlab")}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <Unlink className="w-4 h-4" />
+              Disconnect
+            </Button>
+          )}
+        </div>
       </div>
 
       <ConnectionStatus
