@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +8,8 @@ import { useRepositoryBranches } from "@/hooks/useRepositoryBranches";
 import { useLatestCommit } from "@/hooks/useLatestCommit";
 import { toast } from "@/hooks/use-toast";
 import type { GitLabProject } from "@/services/versionControlService";
+import { useState } from "react";
+import { GitGraphModal } from "./GitGraphModal";
 
 interface Props {
   project: GitLabProject;
@@ -17,6 +18,8 @@ interface Props {
 }
 
 export const GitLabProjectCard: React.FC<Props> = ({ project, branch, setBranch }) => {
+  const [showGraph, setShowGraph] = useState(false);
+
   const { branches, loading: branchLoading, error: branchError } = useRepositoryBranches({
     provider: "gitlab",
     projectId: project.id,
@@ -146,6 +149,22 @@ export const GitLabProjectCard: React.FC<Props> = ({ project, branch, setBranch 
             )}
           </div>
         </div>
+        <div className="flex gap-2 mt-2">
+          <button
+            type="button"
+            className="bg-slate-100 hover:bg-slate-200 border text-xs font-semibold rounded px-2 py-1"
+            onClick={() => setShowGraph(true)}
+          >
+            View Git Graph
+          </button>
+        </div>
+        <GitGraphModal
+          isOpen={showGraph}
+          onClose={() => setShowGraph(false)}
+          provider="gitlab"
+          projectId={project.id}
+          branch={branch}
+        />
       </CardContent>
     </Card>
   );

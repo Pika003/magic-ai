@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import {
   fetchGitHubRepositories,
@@ -32,6 +31,11 @@ export const useVersionControl = () => {
     }
   };
 
+  const [activeTab, setActiveTab] = useState<'github' | 'gitlab'>('github');
+  // Track if we've fetched already to avoid multiple API calls
+  const [githubFetched, setGithubFetched] = useState(false);
+  const [gitlabFetched, setGitlabFetched] = useState(false);
+
   const fetchGitHubData = async () => {
     setLoading(true);
     setError(null);
@@ -44,6 +48,7 @@ export const useVersionControl = () => {
       } else {
         setGithubRepos([]);
       }
+      setGithubFetched(true);
     } catch (e) {
       setError("Failed to fetch GitHub repositories.");
       setGithubRepos([]);
@@ -64,6 +69,7 @@ export const useVersionControl = () => {
       } else {
         setGitlabProjects([]);
       }
+      setGitlabFetched(true);
     } catch (e) {
       setError("Failed to fetch GitLab projects.");
       setGitlabProjects([]);
@@ -72,20 +78,34 @@ export const useVersionControl = () => {
     }
   };
 
+  // Fetch only for active tab
+  useEffect(() => {
+    if (activeTab === 'github' && !githubFetched) {
+      fetchGitHubData();
+    }
+    if (activeTab === 'gitlab' && !gitlabFetched) {
+      fetchGitLabData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
   // Used by page/tab to fetch only what is needed
   const fetchDataForTab = async (tab: 'github' | 'gitlab') => {
-    if (tab === 'github') {
+    setActiveTab(tab);
+    if (tab === 'github' && !githubFetched) {
       await fetchGitHubData();
-    } else {
+    } else if (tab === 'gitlab' && !gitlabFetched) {
       await fetchGitLabData();
     }
   };
 
-  // Expose single refresh that reloads both (used by Refresh)
+  // For manual refresh (refreshes both)
   const refreshData = async () => {
     setLoading(true);
     setError(null);
     await checkConnections();
+    setGithubFetched(false);
+    setGitlabFetched(false);
     await Promise.all([fetchGitHubData(), fetchGitLabData()]);
     setLoading(false);
     toast({
@@ -94,12 +114,10 @@ export const useVersionControl = () => {
     });
   };
 
-  // By default: initialize both
+  // Change: don't run both fetches on mount, only check connections
   useEffect(() => {
     (async () => {
       await checkConnections();
-      await Promise.all([fetchGitHubData(), fetchGitLabData()]);
-      setLoading(false);
     })();
   }, []);
 
@@ -112,6 +130,8 @@ export const useVersionControl = () => {
     error,
     refreshData,
     fetchDataForTab,
+    activeTab, // expose current tab
+    setActiveTab, // expose setter
     checkConnections,
   };
 };

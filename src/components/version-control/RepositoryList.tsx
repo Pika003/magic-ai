@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Github, Gitlab, Search, Star, StarOff, Filter } from 'lucide-react';
@@ -25,6 +24,8 @@ const SORT_OPTIONS: { label: string; value: SortingOption }[] = [
   { label: "Name (A-Z)", value: "name" },
 ];
 
+const FAVORITES_KEY = "repo-favorites";
+
 export const RepositoryList: React.FC<RepositoryListProps> = ({
   githubRepos = [],
   gitlabProjects = [],
@@ -37,12 +38,24 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const [search, setSearch] = useState("");
   const [sorting, setSorting] = useState<SortingOption>("updated");
   const [page, setPage] = useState(1);
-  const [favorites, setFavorites] = useState<{ [id: string]: boolean }>({});
+  const [favorites, setFavorites] = useState<{ [id: string]: boolean }>(() => {
+    // Restore from localStorage
+    try {
+      const stored = localStorage.getItem(FAVORITES_KEY);
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
   const [modalRepo, setModalRepo] = useState<GitHubRepository | GitLabProject | null>(null);
 
   // Helper functions
   const handleFavorite = (id: string | number, isFav: boolean) => {
-    setFavorites(favs => ({ ...favs, [id]: isFav }));
+    setFavorites(favs => {
+      const newFavs = { ...favs, [id]: isFav };
+      localStorage.setItem(FAVORITES_KEY, JSON.stringify(newFavs));
+      return newFavs;
+    });
   };
 
   // Filtering & Sorting (GitHub)
