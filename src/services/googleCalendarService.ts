@@ -148,7 +148,7 @@ export const getUpcomingEvents = async (userId: string, limit = 3): Promise<Cale
       showDeleted: false,
       singleEvents: true,
       orderBy: 'startTime'
-    });
+    } as any); // <-- casting as any to bypass the typing
 
     const events: CalendarEvent[] = response.result.items?.map((event: any) => ({
       id: event.id,
@@ -209,7 +209,7 @@ export const getTodaysEvents = async (userId: string): Promise<CalendarEvent[]> 
       showDeleted: false,
       singleEvents: true,
       orderBy: 'startTime'
-    });
+    } as any); // <-- casting as any here as well
 
     const events: CalendarEvent[] = response.result.items?.map((event: any) => ({
       id: event.id,
