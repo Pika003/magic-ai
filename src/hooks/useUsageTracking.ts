@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -6,6 +7,9 @@ import { toast } from '@/hooks/use-toast';
 interface ProfileStatus {
   paid_user: boolean;
 }
+
+// Create a global event for paid unlocks
+const PAID_UNLOCK_EVENT = "sentence-ai-paid-unlock";
 
 export const useUsageTracking = () => {
   const { user } = useAuth();
@@ -105,14 +109,25 @@ export const useUsageTracking = () => {
     }
   };
 
-  // After upgrade, this fetch will reload paid_user state.
+  // After upgrade, this fetch will reload paid_user state,
+  // and fire a GLOBAL event to all listeners to refetch paid status.
   const refreshPaidStatus = async () => {
     await fetchUserStatus();
     await fetchTotalUsage();
+    window.dispatchEvent(new Event(PAID_UNLOCK_EVENT));
   };
 
   useEffect(() => {
     fetchTotalUsage();
+    // Listen for global paid status change events
+    const listener = () => {
+      fetchTotalUsage();
+    };
+    window.addEventListener(PAID_UNLOCK_EVENT, listener);
+    return () => {
+      window.removeEventListener(PAID_UNLOCK_EVENT, listener);
+    };
+    // We want to fire when user changes as well
   }, [user]);
 
   return {
@@ -126,3 +141,4 @@ export const useUsageTracking = () => {
     refreshPaidStatus // Add this so consumers can force refresh after payment.
   };
 };
+

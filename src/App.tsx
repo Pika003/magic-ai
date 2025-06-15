@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,12 +18,19 @@ import VersionControlPage from "./pages/VersionControlPage";
 import PaymentPage from "./pages/PaymentPage";
 import { Layout } from "@/components/Layout";
 import { useUsageTracking } from "@/hooks/useUsageTracking";
-
-const queryClient = new QueryClient();
+import React from "react";
 
 // PaidUserRoute: Only allows paid users through, otherwise redirects to /payment
 const PaidUserRoute = ({ children }: { children: React.ReactNode }) => {
   const { isPaidUser, loading } = useUsageTracking();
+  // Ensure we re-render if the paid status changes (e.g. after payment) using a listener
+  const [, setRefresh] = React.useState(0);
+
+  React.useEffect(() => {
+    const onPaidUnlock = () => setRefresh((n) => n + 1);
+    window.addEventListener("sentence-ai-paid-unlock", onPaidUnlock);
+    return () => window.removeEventListener("sentence-ai-paid-unlock", onPaidUnlock);
+  }, []);
 
   if (loading) {
     return (
@@ -38,6 +46,8 @@ const PaidUserRoute = ({ children }: { children: React.ReactNode }) => {
   }
   return <>{children}</>;
 };
+
+const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
