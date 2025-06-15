@@ -9,6 +9,13 @@ const Index = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
+  // This effect must always be called
+  React.useEffect(() => {
+    if (user && !loading) {
+      navigate('/correct-sentence');
+    }
+  }, [user, loading, navigate]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -27,11 +34,7 @@ const Index = () => {
     );
   }
 
-  // For authenticated users, redirect to correct sentence by default
-  React.useEffect(() => {
-    navigate('/correct-sentence');
-  }, [navigate]);
-
+  // For authenticated users, show a spinner (since we redirect in useEffect)
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <Navigation />
