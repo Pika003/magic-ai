@@ -10,9 +10,13 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
   return (
     <div className="min-h-screen bg-slate-50">
       <Navigation />
-      <div className="flex">
-        {user && <Sidebar />}
-        <main className={`flex-1 pt-16 ${user ? 'ml-64' : ''}`}>
+      <div className="flex pt-16">
+        {user && (
+          <div className="w-64 shrink-0">
+            <Sidebar />
+          </div>
+        )}
+        <main className="flex-1">
           <div className="container mx-auto px-4 py-8">
             {children}
           </div>
