@@ -49,7 +49,7 @@ const handleOAuthStart = async (provider: 'github' | 'gitlab') => {
     });
     return;
   }
-  
+
   const anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indydm9ia2NneG1lbWV4ZXJueG5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk4NzQ3OTYsImV4cCI6MjA2NTQ1MDc5Nn0.6GeVPRT-hzf5uliidVKHppOHuKrmPSFrHNK8k6hibeg";
 
   let endpoint = '';
@@ -58,7 +58,7 @@ const handleOAuthStart = async (provider: 'github' | 'gitlab') => {
   } else {
     endpoint = 'https://wrvobkcgxmemexernxne.supabase.co/functions/v1/gitlab-oauth/start';
   }
-  
+
   try {
     const res = await fetch(endpoint, {
       method: "GET",
@@ -69,7 +69,8 @@ const handleOAuthStart = async (provider: 'github' | 'gitlab') => {
     });
     const data = await res.json();
     if (data.url) {
-      window.location.href = data.url;
+      // Open the OAuth link in a new tab for verification
+      window.open(data.url, "_blank", "noopener,noreferrer");
     } else {
       let description = "Failed to get OAuth URL. Please try again.";
       if (data.error) {
