@@ -12,16 +12,6 @@ const GITHUB_CLIENT_SECRET = Deno.env.get("GITHUB_CLIENT_SECRET");
 const APP_URL = Deno.env.get("APP_URL") || "https://wrvobkcgxmemexernxne.supabase.co";
 const FRONTEND_URL = "https://preview--sentence-scribe-ai-magic.lovable.app";
 
-async function getUserIdFromRequest(req: Request) {
-  // Uses the Supabase JWT to identify the current user
-  const supabaseAuth = req.headers.get("Authorization");
-  if (!supabaseAuth || !supabaseAuth.startsWith('Bearer ')) return null;
-  const jwt = supabaseAuth.replace("Bearer ", "");
-  // Call Supabase Auth API to get user info
-  const { sub } = parseJwt(jwt) as { sub?: string };
-  return sub ?? null;
-}
-
 // Helper to parse JWT and extract fields
 function parseJwt(token: string) {
   const base64Url = token.split('.')[1];
@@ -41,21 +31,54 @@ serve(async (req: Request) => {
 
   // 1. Step: user triggers /start from client
   if (action === "start") {
+    // Get the Supabase token from the request body
+    let supabaseToken = null;
+    try {
+      const body = await req.json();
+      supabaseToken = body.supabaseToken;
+    } catch (e) {
+      // If no body, try to get from Authorization header
+      const authHeader = req.headers.get("Authorization");
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        supabaseToken = authHeader.replace("Bearer ", "");
+      }
+    }
+
+    if (!supabaseToken) {
+      return new Response(JSON.stringify({ error: "No Supabase token provided" }), { 
+        status: 400, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      });
+    }
+
+    // Include the supabaseToken in the state parameter for GitHub OAuth
+    const state = encodeURIComponent(supabaseToken);
     const redirectUri = `${APP_URL}/functions/v1/github-oauth/callback`;
-    const githubUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&scope=repo%20user&redirect_uri=${encodeURIComponent(redirectUri)}`;
-    return new Response(JSON.stringify({ url: githubUrl }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const githubUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&scope=repo%20user&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
+    
+    return new Response(JSON.stringify({ url: githubUrl }), { 
+      headers: { ...corsHeaders, "Content-Type": "application/json" } 
+    });
   }
 
   // 2. Step: OAuth callback
   if (action === "callback") {
     try {
       const code = url.searchParams.get('code');
-      const supaToken = url.searchParams.get('supabaseToken');
-      if (!code || !supaToken) {
-        const msg = !code ? "Missing_authorization_code" : "Missing_Supabase_token";
-        const redirect = new URL(`/version-control?provider=github&status=error&message=${msg}`, FRONTEND_URL);
+      const state = url.searchParams.get('state');
+      
+      if (!code) {
+        const redirect = new URL(`/version-control?provider=github&status=error&message=Missing_authorization_code`, FRONTEND_URL);
         return Response.redirect(redirect.href, 302);
       }
+
+      if (!state) {
+        const redirect = new URL(`/version-control?provider=github&status=error&message=Missing_Supabase_token`, FRONTEND_URL);
+        return Response.redirect(redirect.href, 302);
+      }
+
+      const supaToken = decodeURIComponent(state);
+
       // Exchange code for access token
       const tokenResp = await fetch("https://github.com/login/oauth/access_token", {
         method: "POST",
@@ -83,6 +106,7 @@ serve(async (req: Request) => {
         const redirect = new URL(`/version-control?provider=github&status=error&message=NoUserId`, FRONTEND_URL);
         return Response.redirect(redirect.href, 302);
       }
+
       await fetch(`${APP_URL}/rest/v1/user_github_tokens`, {
         method: "POST",
         headers: {
@@ -107,5 +131,9 @@ serve(async (req: Request) => {
       return Response.redirect(redirect.href, 302);
     }
   }
-  return new Response(JSON.stringify({ error: "Invalid endpoint", path: url.pathname }), { status: 400, headers: corsHeaders });
+  
+  return new Response(JSON.stringify({ error: "Invalid endpoint", path: url.pathname }), { 
+    status: 400, 
+    headers: corsHeaders 
+  });
 });

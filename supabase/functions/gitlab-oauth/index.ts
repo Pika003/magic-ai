@@ -29,20 +29,53 @@ serve(async (req: Request) => {
   const action = path_parts[path_parts.length - 1] || path_parts[path_parts.length - 2];
 
   if (action === "start") {
+    // Get the Supabase token from the request body
+    let supabaseToken = null;
+    try {
+      const body = await req.json();
+      supabaseToken = body.supabaseToken;
+    } catch (e) {
+      // If no body, try to get from Authorization header
+      const authHeader = req.headers.get("Authorization");
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        supabaseToken = authHeader.replace("Bearer ", "");
+      }
+    }
+
+    if (!supabaseToken) {
+      return new Response(JSON.stringify({ error: "No Supabase token provided" }), { 
+        status: 400, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      });
+    }
+
+    // Include the supabaseToken in the state parameter for GitLab OAuth
+    const state = encodeURIComponent(supabaseToken);
     const redirectUri = `${APP_URL}/functions/v1/gitlab-oauth/callback`;
-    const gitlabUrl = `https://gitlab.com/oauth/authorize?client_id=${GITLAB_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=read_user+api`;
-    return new Response(JSON.stringify({ url: gitlabUrl }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const gitlabUrl = `https://gitlab.com/oauth/authorize?client_id=${GITLAB_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=read_user+api&state=${state}`;
+    
+    return new Response(JSON.stringify({ url: gitlabUrl }), { 
+      headers: { ...corsHeaders, "Content-Type": "application/json" } 
+    });
   }
 
   if (action === "callback") {
     try {
       const code = url.searchParams.get('code');
-      const supaToken = url.searchParams.get('supabaseToken');
-      if (!code || !supaToken) {
-        const msg = !code ? "Missing_authorization_code" : "Missing_Supabase_token";
-        const redirect = new URL(`/version-control?provider=gitlab&status=error&message=${msg}`, FRONTEND_URL);
+      const state = url.searchParams.get('state');
+      
+      if (!code) {
+        const redirect = new URL(`/version-control?provider=gitlab&status=error&message=Missing_authorization_code`, FRONTEND_URL);
         return Response.redirect(redirect.href, 302);
       }
+
+      if (!state) {
+        const redirect = new URL(`/version-control?provider=gitlab&status=error&message=Missing_Supabase_token`, FRONTEND_URL);
+        return Response.redirect(redirect.href, 302);
+      }
+
+      const supaToken = decodeURIComponent(state);
+
       const tokenResp = await fetch("https://gitlab.com/oauth/token", {
         method: "POST",
         headers: {
@@ -58,6 +91,7 @@ serve(async (req: Request) => {
         }).toString(),
       });
       const tokenData = await tokenResp.json();
+      
       if (tokenData.error) {
         const message = encodeURIComponent(tokenData.error_description || tokenData.error);
         const redirect = new URL(`/version-control?provider=gitlab&status=error&message=${message}`, FRONTEND_URL);
@@ -70,6 +104,7 @@ serve(async (req: Request) => {
         const redirect = new URL(`/version-control?provider=gitlab&status=error&message=NoUserId`, FRONTEND_URL);
         return Response.redirect(redirect.href, 302);
       }
+
       await fetch(`${APP_URL}/rest/v1/user_gitlab_tokens`, {
         method: "POST",
         headers: {
@@ -95,5 +130,8 @@ serve(async (req: Request) => {
     }
   }
 
-  return new Response(JSON.stringify({ error: "Invalid endpoint", path: url.pathname }), { status: 400, headers: corsHeaders });
+  return new Response(JSON.stringify({ error: "Invalid endpoint", path: url.pathname }), { 
+    status: 400, 
+    headers: corsHeaders 
+  });
 });
