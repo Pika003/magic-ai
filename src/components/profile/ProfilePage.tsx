@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +9,7 @@ import { toast } from '@/hooks/use-toast';
 import { User, Settings, Key, Save } from 'lucide-react';
 import { Navigation } from '@/components/Navigation';
 import { GoogleCalendarIntegration } from '@/components/GoogleCalendarIntegration';
+import { UsageStatsCard } from './UsageStatsCard';
 
 interface Profile {
   id: string;
@@ -179,8 +179,8 @@ export const ProfilePage = () => {
           <p className="text-slate-600">Manage your account, API settings, and integrations</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card>
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
+          <Card className="xl:col-span-1">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <User className="w-5 h-5 text-blue-500" />
@@ -236,7 +236,7 @@ export const ProfilePage = () => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="xl:col-span-1">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <Key className="w-5 h-5 text-green-500" />
@@ -282,7 +282,13 @@ export const ProfilePage = () => {
             </CardContent>
           </Card>
 
-          <GoogleCalendarIntegration />
+          <div className="xl:col-span-1">
+            <UsageStatsCard />
+          </div>
+
+          <div className="xl:col-span-1">
+            <GoogleCalendarIntegration />
+          </div>
         </div>
       </div>
     </div>

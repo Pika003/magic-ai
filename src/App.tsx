@@ -15,6 +15,7 @@ import { TodaysUpdate } from "./components/TodaysUpdate";
 import NotFound from "./pages/NotFound";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import VersionControlPage from "./pages/VersionControlPage";
+import PaymentPage from "./pages/PaymentPage";
 import { Layout } from "@/components/Layout";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,14 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<AuthPage />} />
+            <Route 
+              path="/payment" 
+              element={
+                <ProtectedRoute>
+                  <PaymentPage />
+                </ProtectedRoute>
+              } 
+            />
             {/* Protected pages are now always rendered WITH the Layout, so the header/sidebar show */}
             <Route 
               path="/correct-sentence" 
@@ -99,4 +108,3 @@ const App = () => (
 );
 
 export default App;
-
