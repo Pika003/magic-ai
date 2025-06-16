@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, RefreshCw, Copy, History, Sparkles, MessageSquare } from 'lucide-react';
+import { CheckCircle, RefreshCw, Copy, History, Sparkles, MessageSquare, Save, Settings } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { correctSentenceWithAI } from '@/services/openaiService';
 import { Layout } from '@/components/Layout';
@@ -38,7 +38,154 @@ export const CorrectSentence = () => {
   const [isProcessingPrompt, setIsProcessingPrompt] = useState(false);
   const [promptHistory, setPromptHistory] = useState<PromptHistory[]>([]);
   
+  // Structure state
+  const [structureText, setStructureText] = useState('');
+  const [savedStructure, setSavedStructure] = useState('');
+  const [structuredInputText, setStructuredInputText] = useState('');
+  const [structuredOutput, setStructuredOutput] = useState('');
+  const [isProcessingStructured, setIsProcessingStructured] = useState(false);
+  
   const { incrementUsage, hasReachedLimit } = useUsageTracking();
+
+  const saveStructure = () => {
+    if (!structureText.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a structure template to save.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setSavedStructure(structureText);
+    toast({
+      title: "Structure Saved!",
+      description: "Your structure template has been saved successfully.",
+    });
+  };
+
+  const processWithStructure = async () => {
+    if (!structuredInputText.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter text to process with the structure.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!savedStructure.trim()) {
+      toast({
+        title: "Error",
+        description: "Please save a structure template first.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (hasReachedLimit) {
+      toast({
+        title: "Usage Limit Reached",
+        description: "You've reached your usage limit. Please upgrade to continue.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsProcessingStructured(true);
+    
+    try {
+      const usageSuccess = await incrementUsage('sentence_correction');
+      if (!usageSuccess) {
+        return;
+      }
+
+      const structurePrompt = `Apply the following structure/template to the given content. Transform the input according to the structure requirements while maintaining the original meaning and improving clarity.
+
+Structure Template:
+${savedStructure}
+
+Content to transform:
+${structuredInputText}`;
+
+      const result = await correctSentenceWithAI(structurePrompt, false);
+      setStructuredOutput(result.correctedText);
+      
+      toast({
+        title: "Content Structured!",
+        description: "Your content has been transformed according to the saved structure.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to process content with structure. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessingStructured(false);
+    }
+  };
+
+  const processPrompt = async (isRefresh: boolean = false) => {
+    if (!promptText.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a prompt to improve.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (hasReachedLimit) {
+      toast({
+        title: "Usage Limit Reached",
+        description: "You've reached your usage limit. Please upgrade to continue.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsProcessingPrompt(true);
+    
+    try {
+      const usageSuccess = await incrementUsage('sentence_correction');
+      if (!usageSuccess) {
+        return;
+      }
+
+      // Create a proper prompt improvement request
+      const promptImprovementText = `Transform this rough prompt idea into a clear, professional, and effective prompt that can be used with AI assistants like ChatGPT, Claude, or other AI platforms. Make it specific, actionable, and well-structured with proper context and instructions.
+
+Original rough prompt: "${promptText}"
+
+Please provide only the improved professional prompt without any explanations or additional text.`;
+
+      const result = await correctSentenceWithAI(promptImprovementText, isRefresh);
+      setCorrectedPrompt(result.correctedText);
+      
+      // Add to prompt history
+      const newEntry: PromptHistory = {
+        id: Date.now().toString(),
+        originalPrompt: promptText,
+        correctedPrompt: result.correctedText,
+        timestamp: new Date().toLocaleString()
+      };
+      setPromptHistory(prev => [newEntry, ...prev]);
+      
+      toast({
+        title: "Prompt Improved!",
+        description: isRefresh ? "Generated a new professional prompt variation." : "Your prompt has been transformed into a professional format.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to improve prompt. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessingPrompt(false);
+    }
+  };
 
   const processSentence = async (isRefresh: boolean = false) => {
     if (!inputText.trim()) {
@@ -97,66 +244,6 @@ export const CorrectSentence = () => {
     }
   };
 
-  const processPrompt = async (isRefresh: boolean = false) => {
-    if (!promptText.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a prompt to correct.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (hasReachedLimit) {
-      toast({
-        title: "Usage Limit Reached",
-        description: "You've reached your usage limit. Please upgrade to continue.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsProcessingPrompt(true);
-    
-    try {
-      // Track usage before making API call
-      const usageSuccess = await incrementUsage('sentence_correction');
-      if (!usageSuccess) {
-        return;
-      }
-
-      // Use the existing correctSentenceWithAI function with a specialized prompt
-      const systemPrompt = isRefresh 
-        ? 'You are a professional prompt engineer. Transform the given text into a clear, professional, and effective prompt that can be used on other AI platforms. Make it specific, actionable, and well-structured. Provide alternative variations and improvements.'
-        : 'You are a professional prompt engineer. Transform the given text into a clear, professional, and effective prompt that can be used on other AI platforms. Make it specific, actionable, and well-structured.';
-
-      const result = await correctSentenceWithAI(`${systemPrompt}\n\nOriginal prompt: ${promptText}`, isRefresh);
-      setCorrectedPrompt(result.correctedText);
-      
-      // Add to prompt history
-      const newEntry: PromptHistory = {
-        id: Date.now().toString(),
-        originalPrompt: promptText,
-        correctedPrompt: result.correctedText,
-        timestamp: new Date().toLocaleString()
-      };
-      setPromptHistory(prev => [newEntry, ...prev]);
-      
-      toast({
-        title: "Prompt Corrected!",
-        description: isRefresh ? "Generated a new professional prompt variation." : "Your prompt has been transformed into a professional format.",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to correct prompt. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsProcessingPrompt(false);
-    }
-  };
-
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast({
@@ -172,7 +259,197 @@ export const CorrectSentence = () => {
           {/* Header Section */}
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-slate-800 mb-2">AI Text & Prompt Corrector</h1>
-            <p className="text-slate-600">Improve sentences and create professional prompts for other AI platforms</p>
+            <p className="text-slate-600">Create professional prompts, apply custom structures, and improve sentences</p>
+          </div>
+
+          {/* Professional Prompt Creation Section - Now at the top */}
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-slate-700 mb-4">Professional Prompt Creation</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Prompt Input Card */}
+              <Card className="border-slate-200">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <MessageSquare className="w-5 h-5 text-purple-500" />
+                    <span>Original Prompt</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Textarea
+                    placeholder="Enter your rough prompt idea here... e.g., 'write me a story about a dog'"
+                    value={promptText}
+                    onChange={(e) => setPromptText(e.target.value)}
+                    className="min-h-32 resize-none border-slate-200 focus:border-purple-500"
+                  />
+                  
+                  <div className="flex items-center space-x-2">
+                    <Button 
+                      onClick={() => processPrompt(false)}
+                      disabled={isProcessingPrompt || !promptText.trim() || hasReachedLimit}
+                      className="bg-purple-500 hover:bg-purple-600"
+                    >
+                      {isProcessingPrompt ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <MessageSquare className="w-4 h-4 mr-2" />
+                          Create Professional Prompt
+                        </>
+                      )}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => processPrompt(true)}
+                      disabled={isProcessingPrompt || !promptText.trim() || hasReachedLimit}
+                    >
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Refresh
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Prompt Output Card */}
+              <Card className="border-slate-200">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <CheckCircle className="w-5 h-5 text-purple-500" />
+                    <span>Professional Prompt</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="min-h-32 p-4 bg-purple-50 border border-purple-200 rounded-lg mb-4">
+                    {correctedPrompt ? (
+                      <div className="text-slate-800 whitespace-pre-wrap">{correctedPrompt}</div>
+                    ) : (
+                      <p className="text-slate-400 italic">Professional prompt will appear here...</p>
+                    )}
+                  </div>
+                  
+                  {correctedPrompt && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copyToClipboard(correctedPrompt)}
+                      className="w-full"
+                    >
+                      <Copy className="w-4 h-4 mr-2" />
+                      Copy Professional Prompt
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Structure Section */}
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-slate-700 mb-4">Custom Structure Application</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Structure Template Card */}
+              <Card className="border-slate-200">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Settings className="w-5 h-5 text-orange-500" />
+                    <span>Structure Template</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Textarea
+                    placeholder="Enter your structure template here... e.g., 'Format as: 1. Introduction 2. Main Points 3. Conclusion'"
+                    value={structureText}
+                    onChange={(e) => setStructureText(e.target.value)}
+                    className="min-h-32 resize-none border-slate-200 focus:border-orange-500"
+                  />
+                  
+                  <Button 
+                    onClick={saveStructure}
+                    disabled={!structureText.trim()}
+                    className="w-full bg-orange-500 hover:bg-orange-600"
+                  >
+                    <Save className="w-4 h-4 mr-2" />
+                    Save Structure
+                  </Button>
+                  
+                  {savedStructure && (
+                    <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                      <p className="text-sm text-orange-700 font-medium mb-1">Saved Structure:</p>
+                      <p className="text-sm text-orange-600 line-clamp-3">{savedStructure}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Structure Input Card */}
+              <Card className="border-slate-200">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Sparkles className="w-5 h-5 text-blue-500" />
+                    <span>Content to Structure</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Textarea
+                    placeholder="Enter your content here to apply the saved structure..."
+                    value={structuredInputText}
+                    onChange={(e) => setStructuredInputText(e.target.value)}
+                    className="min-h-32 resize-none border-slate-200 focus:border-blue-500"
+                  />
+                  
+                  <Button 
+                    onClick={processWithStructure}
+                    disabled={isProcessingStructured || !structuredInputText.trim() || !savedStructure || hasReachedLimit}
+                    className="w-full bg-blue-500 hover:bg-blue-600"
+                  >
+                    {isProcessingStructured ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <Settings className="w-4 h-4 mr-2" />
+                        Apply Structure
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Structure Output Card */}
+              <Card className="border-slate-200">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <CheckCircle className="w-5 h-5 text-green-500" />
+                    <span>Structured Content</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="min-h-32 p-4 bg-green-50 border border-green-200 rounded-lg mb-4">
+                    {structuredOutput ? (
+                      <div className="text-slate-800 whitespace-pre-wrap">{structuredOutput}</div>
+                    ) : (
+                      <p className="text-slate-400 italic">Structured content will appear here...</p>
+                    )}
+                  </div>
+                  
+                  {structuredOutput && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copyToClipboard(structuredOutput)}
+                      className="w-full"
+                    >
+                      <Copy className="w-4 h-4 mr-2" />
+                      Copy Structured Content
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
           {/* Sentence Correction Section */}
@@ -268,89 +545,6 @@ export const CorrectSentence = () => {
                         </div>
                       )}
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-
-          {/* Prompt Correction Section */}
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-slate-700 mb-4">Professional Prompt Creation</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Prompt Input Card */}
-              <Card className="border-slate-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <MessageSquare className="w-5 h-5 text-purple-500" />
-                    <span>Original Prompt</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Textarea
-                    placeholder="Enter your rough prompt idea here... write me a story about a dog"
-                    value={promptText}
-                    onChange={(e) => setPromptText(e.target.value)}
-                    className="min-h-32 resize-none border-slate-200 focus:border-purple-500"
-                  />
-                  
-                  <div className="flex items-center space-x-2">
-                    <Button 
-                      onClick={() => processPrompt(false)}
-                      disabled={isProcessingPrompt || !promptText.trim() || hasReachedLimit}
-                      className="bg-purple-500 hover:bg-purple-600"
-                    >
-                      {isProcessingPrompt ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                          Processing...
-                        </>
-                      ) : (
-                        <>
-                          <MessageSquare className="w-4 h-4 mr-2" />
-                          Create Professional Prompt
-                        </>
-                      )}
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => processPrompt(true)}
-                      disabled={isProcessingPrompt || !promptText.trim() || hasReachedLimit}
-                    >
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                      Refresh
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Prompt Output Card */}
-              <Card className="border-slate-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <CheckCircle className="w-5 h-5 text-purple-500" />
-                    <span>Professional Prompt</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="min-h-32 p-4 bg-purple-50 border border-purple-200 rounded-lg mb-4">
-                    {correctedPrompt ? (
-                      <div className="text-slate-800 whitespace-pre-wrap">{correctedPrompt}</div>
-                    ) : (
-                      <p className="text-slate-400 italic">Professional prompt will appear here...</p>
-                    )}
-                  </div>
-                  
-                  {correctedPrompt && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => copyToClipboard(correctedPrompt)}
-                      className="w-full"
-                    >
-                      <Copy className="w-4 h-4 mr-2" />
-                      Copy Professional Prompt
-                    </Button>
                   )}
                 </CardContent>
               </Card>
