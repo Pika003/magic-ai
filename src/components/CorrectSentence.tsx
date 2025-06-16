@@ -1,14 +1,18 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, RefreshCw, Copy, History, Sparkles, MessageSquare, Save, Settings } from 'lucide-react';
+import { CheckCircle, RefreshCw, Copy, History, Sparkles, MessageSquare, Save, Settings, Plus, Trash2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { correctSentenceWithAI } from '@/services/openaiService';
 import { Layout } from '@/components/Layout';
 import { useUsageTracking } from '@/hooks/useUsageTracking';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface CorrectionHistory {
   id: string;
@@ -25,7 +29,15 @@ interface PromptHistory {
   timestamp: string;
 }
 
+interface StructureTemplate {
+  id: string;
+  name: string;
+  template_content: string;
+  created_at: string;
+}
+
 export const CorrectSentence = () => {
+  const { user } = useAuth();
   const [inputText, setInputText] = useState('');
   const [correctedText, setCorrectedText] = useState('');
   const [improvements, setImprovements] = useState<string[]>([]);
@@ -39,29 +51,117 @@ export const CorrectSentence = () => {
   const [promptHistory, setPromptHistory] = useState<PromptHistory[]>([]);
   
   // Structure state
-  const [structureText, setStructureText] = useState('');
-  const [savedStructure, setSavedStructure] = useState('');
+  const [structureTemplates, setStructureTemplates] = useState<StructureTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [newTemplateName, setNewTemplateName] = useState('');
+  const [newTemplateContent, setNewTemplateContent] = useState('');
   const [structuredInputText, setStructuredInputText] = useState('');
   const [structuredOutput, setStructuredOutput] = useState('');
   const [isProcessingStructured, setIsProcessingStructured] = useState(false);
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   
   const { incrementUsage, hasReachedLimit } = useUsageTracking();
 
-  const saveStructure = () => {
-    if (!structureText.trim()) {
+  useEffect(() => {
+    if (user) {
+      fetchStructureTemplates();
+    }
+  }, [user]);
+
+  const fetchStructureTemplates = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('structure_templates')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching structure templates:', error);
+        return;
+      }
+
+      setStructureTemplates(data || []);
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
+  const saveStructureTemplate = async () => {
+    if (!user || !newTemplateName.trim() || !newTemplateContent.trim()) {
       toast({
         title: "Error",
-        description: "Please enter a structure template to save.",
+        description: "Please enter both template name and content.",
         variant: "destructive"
       });
       return;
     }
+
+    setIsSavingTemplate(true);
     
-    setSavedStructure(structureText);
-    toast({
-      title: "Structure Saved!",
-      description: "Your structure template has been saved successfully.",
-    });
+    try {
+      const { error } = await supabase
+        .from('structure_templates')
+        .insert({
+          user_id: user.id,
+          name: newTemplateName,
+          template_content: newTemplateContent
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      setNewTemplateName('');
+      setNewTemplateContent('');
+      await fetchStructureTemplates();
+      
+      toast({
+        title: "Template Saved!",
+        description: "Your structure template has been saved successfully.",
+      });
+    } catch (error) {
+      console.error('Error saving template:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save template. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSavingTemplate(false);
+    }
+  };
+
+  const deleteStructureTemplate = async (templateId: string) => {
+    try {
+      const { error } = await supabase
+        .from('structure_templates')
+        .delete()
+        .eq('id', templateId);
+
+      if (error) {
+        throw error;
+      }
+
+      await fetchStructureTemplates();
+      if (selectedTemplateId === templateId) {
+        setSelectedTemplateId('');
+      }
+      
+      toast({
+        title: "Template Deleted",
+        description: "Structure template has been deleted successfully.",
+      });
+    } catch (error) {
+      console.error('Error deleting template:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete template. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const processWithStructure = async () => {
@@ -74,10 +174,10 @@ export const CorrectSentence = () => {
       return;
     }
 
-    if (!savedStructure.trim()) {
+    if (!selectedTemplateId) {
       toast({
         title: "Error",
-        description: "Please save a structure template first.",
+        description: "Please select a structure template first.",
         variant: "destructive"
       });
       return;
@@ -100,20 +200,27 @@ export const CorrectSentence = () => {
         return;
       }
 
-      const structurePrompt = `Apply the following structure/template to the given content. Transform the input according to the structure requirements while maintaining the original meaning and improving clarity.
+      const selectedTemplate = structureTemplates.find(t => t.id === selectedTemplateId);
+      if (!selectedTemplate) {
+        throw new Error('Selected template not found');
+      }
+
+      const structurePrompt = `Apply the following structure/template to the given content. Transform the input according to the structure requirements while maintaining the original meaning and improving clarity. Return ONLY the transformed content without any explanations, metadata, or JSON formatting.
 
 Structure Template:
-${savedStructure}
+${selectedTemplate.template_content}
 
 Content to transform:
-${structuredInputText}`;
+${structuredInputText}
+
+Important: Provide only the final transformed content as plain text.`;
 
       const result = await correctSentenceWithAI(structurePrompt, false);
       setStructuredOutput(result.correctedText);
       
       toast({
         title: "Content Structured!",
-        description: "Your content has been transformed according to the saved structure.",
+        description: "Your content has been transformed according to the selected structure.",
       });
     } catch (error) {
       toast({
@@ -153,12 +260,11 @@ ${structuredInputText}`;
         return;
       }
 
-      // Create a proper prompt improvement request
-      const promptImprovementText = `Transform this rough prompt idea into a clear, professional, and effective prompt that can be used with AI assistants like ChatGPT, Claude, or other AI platforms. Make it specific, actionable, and well-structured with proper context and instructions.
+      const promptImprovementText = `Transform this rough prompt idea into a clear, professional, and effective prompt that can be used with AI assistants like ChatGPT, Claude, or other AI platforms. Make it specific, actionable, and well-structured with proper context and instructions. Return ONLY the improved professional prompt without any explanations, introductions, or JSON formatting.
 
 Original rough prompt: "${promptText}"
 
-Please provide only the improved professional prompt without any explanations or additional text.`;
+Important: Provide only the professional prompt as plain text.`;
 
       const result = await correctSentenceWithAI(promptImprovementText, isRefresh);
       setCorrectedPrompt(result.correctedText);
@@ -209,10 +315,9 @@ Please provide only the improved professional prompt without any explanations or
     setIsProcessing(true);
     
     try {
-      // Track usage before making API call
       const usageSuccess = await incrementUsage('sentence_correction');
       if (!usageSuccess) {
-        return; // Usage tracking will show the appropriate error
+        return;
       }
 
       const result = await correctSentenceWithAI(inputText, isRefresh);
@@ -262,7 +367,7 @@ Please provide only the improved professional prompt without any explanations or
             <p className="text-slate-600">Create professional prompts, apply custom structures, and improve sentences</p>
           </div>
 
-          {/* Professional Prompt Creation Section - Now at the top */}
+          {/* Professional Prompt Creation Section */}
           <div className="mb-8">
             <h2 className="text-xl font-semibold text-slate-700 mb-4">Professional Prompt Creation</h2>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -345,39 +450,115 @@ Please provide only the improved professional prompt without any explanations or
             </div>
           </div>
 
-          {/* Structure Section */}
+          {/* Custom Structure Application Section */}
           <div className="mb-8">
             <h2 className="text-xl font-semibold text-slate-700 mb-4">Custom Structure Application</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Structure Template Card */}
+            
+            {/* Structure Template Management */}
+            <div className="mb-6">
               <Card className="border-slate-200">
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
                     <Settings className="w-5 h-5 text-orange-500" />
-                    <span>Structure Template</span>
+                    <span>Manage Structure Templates</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <Textarea
-                    placeholder="Enter your structure template here... e.g., 'Format as: 1. Introduction 2. Main Points 3. Conclusion'"
-                    value={structureText}
-                    onChange={(e) => setStructureText(e.target.value)}
-                    className="min-h-32 resize-none border-slate-200 focus:border-orange-500"
-                  />
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Template Name</label>
+                      <Input
+                        placeholder="e.g., Blog Post Structure"
+                        value={newTemplateName}
+                        onChange={(e) => setNewTemplateName(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Template Content</label>
+                      <Textarea
+                        placeholder="e.g., 1. Introduction 2. Main Points 3. Conclusion"
+                        value={newTemplateContent}
+                        onChange={(e) => setNewTemplateContent(e.target.value)}
+                        className="min-h-20 resize-none"
+                      />
+                    </div>
+                  </div>
                   
                   <Button 
-                    onClick={saveStructure}
-                    disabled={!structureText.trim()}
-                    className="w-full bg-orange-500 hover:bg-orange-600"
+                    onClick={saveStructureTemplate}
+                    disabled={isSavingTemplate || !newTemplateName.trim() || !newTemplateContent.trim()}
+                    className="bg-orange-500 hover:bg-orange-600"
                   >
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Structure
+                    {isSavingTemplate ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Save Template
+                      </>
+                    )}
                   </Button>
                   
-                  {savedStructure && (
-                    <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                      <p className="text-sm text-orange-700 font-medium mb-1">Saved Structure:</p>
-                      <p className="text-sm text-orange-600 line-clamp-3">{savedStructure}</p>
+                  {structureTemplates.length > 0 && (
+                    <div className="mt-4">
+                      <label className="text-sm font-medium mb-2 block">Saved Templates</label>
+                      <div className="space-y-2 max-h-32 overflow-y-auto">
+                        {structureTemplates.map((template) => (
+                          <div key={template.id} className="flex items-center justify-between p-2 bg-orange-50 border border-orange-200 rounded">
+                            <div>
+                              <p className="font-medium text-sm">{template.name}</p>
+                              <p className="text-xs text-slate-500 line-clamp-1">{template.template_content}</p>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => deleteStructureTemplate(template.id)}
+                              className="text-red-500 hover:text-red-700"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Structure Application */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Template Selection */}
+              <Card className="border-slate-200">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Settings className="w-5 h-5 text-blue-500" />
+                    <span>Select Template</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a structure template" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {structureTemplates.map((template) => (
+                        <SelectItem key={template.id} value={template.id}>
+                          {template.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  {selectedTemplateId && (
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-700 font-medium mb-1">Selected Template:</p>
+                      <p className="text-sm text-blue-600">
+                        {structureTemplates.find(t => t.id === selectedTemplateId)?.template_content}
+                      </p>
                     </div>
                   )}
                 </CardContent>
@@ -387,22 +568,22 @@ Please provide only the improved professional prompt without any explanations or
               <Card className="border-slate-200">
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
-                    <Sparkles className="w-5 h-5 text-blue-500" />
+                    <Sparkles className="w-5 h-5 text-green-500" />
                     <span>Content to Structure</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <Textarea
-                    placeholder="Enter your content here to apply the saved structure..."
+                    placeholder="Enter your content here to apply the selected structure..."
                     value={structuredInputText}
                     onChange={(e) => setStructuredInputText(e.target.value)}
-                    className="min-h-32 resize-none border-slate-200 focus:border-blue-500"
+                    className="min-h-32 resize-none border-slate-200 focus:border-green-500"
                   />
                   
                   <Button 
                     onClick={processWithStructure}
-                    disabled={isProcessingStructured || !structuredInputText.trim() || !savedStructure || hasReachedLimit}
-                    className="w-full bg-blue-500 hover:bg-blue-600"
+                    disabled={isProcessingStructured || !structuredInputText.trim() || !selectedTemplateId || hasReachedLimit}
+                    className="w-full bg-green-500 hover:bg-green-600"
                   >
                     {isProcessingStructured ? (
                       <>
@@ -423,12 +604,12 @@ Please provide only the improved professional prompt without any explanations or
               <Card className="border-slate-200">
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
-                    <CheckCircle className="w-5 h-5 text-green-500" />
+                    <CheckCircle className="w-5 h-5 text-emerald-500" />
                     <span>Structured Content</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="min-h-32 p-4 bg-green-50 border border-green-200 rounded-lg mb-4">
+                  <div className="min-h-32 p-4 bg-emerald-50 border border-emerald-200 rounded-lg mb-4">
                     {structuredOutput ? (
                       <div className="text-slate-800 whitespace-pre-wrap">{structuredOutput}</div>
                     ) : (

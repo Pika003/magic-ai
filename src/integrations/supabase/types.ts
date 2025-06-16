@@ -200,6 +200,33 @@ export type Database = {
         }
         Relationships: []
       }
+      structure_templates: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          template_content: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          template_content: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          template_content?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_calendar_events: {
         Row: {
           created_at: string
