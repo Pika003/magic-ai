@@ -1,297 +1,43 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, RefreshCw, Copy, History, Sparkles, MessageSquare, Save, Settings, Plus, Trash2 } from 'lucide-react';
+import { CheckCircle, MessageSquare, RefreshCw, Copy, Send, Lightbulb } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { correctSentenceWithAI } from '@/services/openaiService';
+import { correctSentenceWithAI, generateProfessionalPromptWithAI } from '@/services/openaiService';
 import { Layout } from '@/components/Layout';
 import { useUsageTracking } from '@/hooks/useUsageTracking';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-interface CorrectionHistory {
+interface CorrectedSentence {
   id: string;
   originalText: string;
   correctedText: string;
-  improvements: string[];
-  timestamp: string;
+  createdAt: string;
 }
 
-interface PromptHistory {
+interface GeneratedPrompt {
   id: string;
-  originalPrompt: string;
-  correctedPrompt: string;
-  timestamp: string;
-}
-
-interface StructureTemplate {
-  id: string;
-  name: string;
-  template_content: string;
-  created_at: string;
+  keywords: string;
+  generatedPrompt: string;
+  createdAt: string;
 }
 
 export const CorrectSentence = () => {
-  const { user } = useAuth();
   const [inputText, setInputText] = useState('');
   const [correctedText, setCorrectedText] = useState('');
-  const [improvements, setImprovements] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [history, setHistory] = useState<CorrectionHistory[]>([]);
+  const [corrections, setCorrections] = useState<CorrectedSentence[]>([]);
   
-  // Prompt correction state
-  const [promptText, setPromptText] = useState('');
-  const [correctedPrompt, setCorrectedPrompt] = useState('');
-  const [isProcessingPrompt, setIsProcessingPrompt] = useState(false);
-  const [promptHistory, setPromptHistory] = useState<PromptHistory[]>([]);
-  
-  // Structure state
-  const [structureTemplates, setStructureTemplates] = useState<StructureTemplate[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
-  const [newTemplateName, setNewTemplateName] = useState('');
-  const [newTemplateContent, setNewTemplateContent] = useState('');
-  const [structuredInputText, setStructuredInputText] = useState('');
-  const [structuredOutput, setStructuredOutput] = useState('');
-  const [isProcessingStructured, setIsProcessingStructured] = useState(false);
-  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  // Professional Prompt Creation state
+  const [promptKeywords, setPromptKeywords] = useState('');
+  const [generatedPrompt, setGeneratedPrompt] = useState('');
+  const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
+  const [promptHistory, setPromptHistory] = useState<GeneratedPrompt[]>([]);
   
   const { incrementUsage, hasReachedLimit } = useUsageTracking();
-
-  useEffect(() => {
-    if (user) {
-      fetchStructureTemplates();
-    }
-  }, [user]);
-
-  const fetchStructureTemplates = async () => {
-    if (!user) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('structure_templates')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching structure templates:', error);
-        return;
-      }
-
-      setStructureTemplates(data || []);
-    } catch (error) {
-      console.error('Error:', error);
-    }
-  };
-
-  const saveStructureTemplate = async () => {
-    if (!user || !newTemplateName.trim() || !newTemplateContent.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter both template name and content.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsSavingTemplate(true);
-    
-    try {
-      const { error } = await supabase
-        .from('structure_templates')
-        .insert({
-          user_id: user.id,
-          name: newTemplateName,
-          template_content: newTemplateContent
-        });
-
-      if (error) {
-        throw error;
-      }
-
-      setNewTemplateName('');
-      setNewTemplateContent('');
-      await fetchStructureTemplates();
-      
-      toast({
-        title: "Template Saved!",
-        description: "Your structure template has been saved successfully.",
-      });
-    } catch (error) {
-      console.error('Error saving template:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save template. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsSavingTemplate(false);
-    }
-  };
-
-  const deleteStructureTemplate = async (templateId: string) => {
-    try {
-      const { error } = await supabase
-        .from('structure_templates')
-        .delete()
-        .eq('id', templateId);
-
-      if (error) {
-        throw error;
-      }
-
-      await fetchStructureTemplates();
-      if (selectedTemplateId === templateId) {
-        setSelectedTemplateId('');
-      }
-      
-      toast({
-        title: "Template Deleted",
-        description: "Structure template has been deleted successfully.",
-      });
-    } catch (error) {
-      console.error('Error deleting template:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete template. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const processWithStructure = async () => {
-    if (!structuredInputText.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter text to process with the structure.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!selectedTemplateId) {
-      toast({
-        title: "Error",
-        description: "Please select a structure template first.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (hasReachedLimit) {
-      toast({
-        title: "Usage Limit Reached",
-        description: "You've reached your usage limit. Please upgrade to continue.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsProcessingStructured(true);
-    
-    try {
-      const usageSuccess = await incrementUsage('sentence_correction');
-      if (!usageSuccess) {
-        return;
-      }
-
-      const selectedTemplate = structureTemplates.find(t => t.id === selectedTemplateId);
-      if (!selectedTemplate) {
-        throw new Error('Selected template not found');
-      }
-
-      const structurePrompt = `Apply the following structure/template to the given content. Transform the input according to the structure requirements while maintaining the original meaning and improving clarity. Return ONLY the transformed content without any explanations, metadata, or JSON formatting.
-
-Structure Template:
-${selectedTemplate.template_content}
-
-Content to transform:
-${structuredInputText}
-
-Important: Provide only the final transformed content as plain text.`;
-
-      const result = await correctSentenceWithAI(structurePrompt, false);
-      setStructuredOutput(result.correctedText);
-      
-      toast({
-        title: "Content Structured!",
-        description: "Your content has been transformed according to the selected structure.",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to process content with structure. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsProcessingStructured(false);
-    }
-  };
-
-  const processPrompt = async (isRefresh: boolean = false) => {
-    if (!promptText.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a prompt to improve.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (hasReachedLimit) {
-      toast({
-        title: "Usage Limit Reached",
-        description: "You've reached your usage limit. Please upgrade to continue.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsProcessingPrompt(true);
-    
-    try {
-      const usageSuccess = await incrementUsage('sentence_correction');
-      if (!usageSuccess) {
-        return;
-      }
-
-      const promptImprovementText = `Transform this rough prompt idea into a clear, professional, and effective prompt that can be used with AI assistants like ChatGPT, Claude, or other AI platforms. Make it specific, actionable, and well-structured with proper context and instructions. Return ONLY the improved professional prompt without any explanations, introductions, or JSON formatting.
-
-Original rough prompt: "${promptText}"
-
-Important: Provide only the professional prompt as plain text.`;
-
-      const result = await correctSentenceWithAI(promptImprovementText, isRefresh);
-      setCorrectedPrompt(result.correctedText);
-      
-      // Add to prompt history
-      const newEntry: PromptHistory = {
-        id: Date.now().toString(),
-        originalPrompt: promptText,
-        correctedPrompt: result.correctedText,
-        timestamp: new Date().toLocaleString()
-      };
-      setPromptHistory(prev => [newEntry, ...prev]);
-      
-      toast({
-        title: "Prompt Improved!",
-        description: isRefresh ? "Generated a new professional prompt variation." : "Your prompt has been transformed into a professional format.",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to improve prompt. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsProcessingPrompt(false);
-    }
-  };
 
   const processSentence = async (isRefresh: boolean = false) => {
     if (!inputText.trim()) {
@@ -320,23 +66,12 @@ Important: Provide only the professional prompt as plain text.`;
         return;
       }
 
-      const result = await correctSentenceWithAI(inputText, isRefresh);
-      setCorrectedText(result.correctedText);
-      setImprovements(result.improvements);
-      
-      // Add to history
-      const newEntry: CorrectionHistory = {
-        id: Date.now().toString(),
-        originalText: inputText,
-        correctedText: result.correctedText,
-        improvements: result.improvements,
-        timestamp: new Date().toLocaleString()
-      };
-      setHistory(prev => [newEntry, ...prev]);
+      const corrected = await correctSentenceWithAI(inputText, isRefresh);
+      setCorrectedText(corrected);
       
       toast({
         title: "Sentence Corrected!",
-        description: isRefresh ? "Generated a new correction for your sentence." : "Your sentence has been corrected and improved.",
+        description: isRefresh ? "Generated a new variation of your corrected sentence." : "Your sentence has been corrected using AI.",
       });
     } catch (error) {
       toast({
@@ -347,6 +82,91 @@ Important: Provide only the professional prompt as plain text.`;
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const generatePrompt = async () => {
+    if (!promptKeywords.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter keywords or topic for prompt generation.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (hasReachedLimit) {
+      toast({
+        title: "Usage Limit Reached",
+        description: "You've reached your usage limit. Please upgrade to continue.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsGeneratingPrompt(true);
+    
+    try {
+      const usageSuccess = await incrementUsage('prompt_generation');
+      if (!usageSuccess) {
+        return;
+      }
+
+      const prompt = await generateProfessionalPromptWithAI(promptKeywords);
+      setGeneratedPrompt(prompt);
+      
+      toast({
+        title: "Professional Prompt Generated!",
+        description: "Your AI prompt has been created successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to generate prompt. Please check your API key in Profile settings.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeneratingPrompt(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    processSentence(true);
+  };
+
+  const saveSentence = () => {
+    const newCorrection: CorrectedSentence = {
+      id: Date.now().toString(),
+      originalText: inputText,
+      correctedText: correctedText,
+      createdAt: new Date().toLocaleString()
+    };
+
+    setCorrections([newCorrection, ...corrections]);
+    setInputText('');
+    setCorrectedText('');
+    
+    toast({
+      title: "Correction Saved!",
+      description: "Your corrected sentence has been saved.",
+    });
+  };
+
+  const savePrompt = () => {
+    const newPrompt: GeneratedPrompt = {
+      id: Date.now().toString(),
+      keywords: promptKeywords,
+      generatedPrompt: generatedPrompt,
+      createdAt: new Date().toLocaleString()
+    };
+
+    setPromptHistory([newPrompt, ...promptHistory]);
+    setPromptKeywords('');
+    setGeneratedPrompt('');
+    
+    toast({
+      title: "Prompt Saved!",
+      description: "Your generated prompt has been saved.",
+    });
   };
 
   const copyToClipboard = (text: string) => {
@@ -363,424 +183,181 @@ Important: Provide only the professional prompt as plain text.`;
         <div className="max-w-7xl mx-auto">
           {/* Header Section */}
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-slate-800 mb-2">AI Text & Prompt Corrector</h1>
-            <p className="text-slate-600">Create professional prompts, apply custom structures, and improve sentences</p>
+            <h1 className="text-3xl font-bold text-slate-800 mb-2">AI Content Tools</h1>
+            <p className="text-slate-600">Professional prompt creation and instant sentence correction</p>
           </div>
 
-          {/* Professional Prompt Creation Section */}
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-slate-700 mb-4">Professional Prompt Creation</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Prompt Input Card */}
-              <Card className="border-slate-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <MessageSquare className="w-5 h-5 text-purple-500" />
-                    <span>Original Prompt</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Textarea
-                    placeholder="Enter your rough prompt idea here... e.g., 'write me a story about a dog'"
-                    value={promptText}
-                    onChange={(e) => setPromptText(e.target.value)}
-                    className="min-h-32 resize-none border-slate-200 focus:border-purple-500"
-                  />
-                  
-                  <div className="flex items-center space-x-2">
-                    <Button 
-                      onClick={() => processPrompt(false)}
-                      disabled={isProcessingPrompt || !promptText.trim() || hasReachedLimit}
-                      className="bg-purple-500 hover:bg-purple-600"
-                    >
-                      {isProcessingPrompt ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                          Processing...
-                        </>
-                      ) : (
-                        <>
-                          <MessageSquare className="w-4 h-4 mr-2" />
-                          Create Professional Prompt
-                        </>
-                      )}
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => processPrompt(true)}
-                      disabled={isProcessingPrompt || !promptText.trim() || hasReachedLimit}
-                    >
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                      Refresh
-                    </Button>
+          {/* Professional Prompt Creation Section - Now at top */}
+          <Card className="border-slate-200 mb-8">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Lightbulb className="w-5 h-5 text-yellow-500" />
+                <span>Professional Prompt Creation</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Input Side */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-slate-700 mb-2 block">
+                      Keywords or Topic
+                    </label>
+                    <Input
+                      placeholder="e.g., email marketing, project management, customer service"
+                      value={promptKeywords}
+                      onChange={(e) => setPromptKeywords(e.target.value)}
+                      className="border-slate-200 focus:border-yellow-500"
+                    />
                   </div>
-                </CardContent>
-              </Card>
 
-              {/* Prompt Output Card */}
-              <Card className="border-slate-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <CheckCircle className="w-5 h-5 text-purple-500" />
-                    <span>Professional Prompt</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="min-h-32 p-4 bg-purple-50 border border-purple-200 rounded-lg mb-4">
-                    {correctedPrompt ? (
-                      <div className="text-slate-800 whitespace-pre-wrap">{correctedPrompt}</div>
+                  <Button
+                    onClick={generatePrompt}
+                    disabled={isGeneratingPrompt || !promptKeywords.trim() || hasReachedLimit}
+                    className="w-full bg-yellow-500 hover:bg-yellow-600"
+                  >
+                    {isGeneratingPrompt ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Lightbulb className="w-4 h-4 mr-2" />
+                        Generate Professional Prompt
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {/* Output Side */}
+                <div className="space-y-4">
+                  <div className="min-h-32 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    {generatedPrompt ? (
+                      <div className="text-slate-800 whitespace-pre-wrap">{generatedPrompt}</div>
                     ) : (
                       <p className="text-slate-400 italic">Professional prompt will appear here...</p>
                     )}
                   </div>
-                  
-                  {correctedPrompt && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => copyToClipboard(correctedPrompt)}
-                      className="w-full"
-                    >
-                      <Copy className="w-4 h-4 mr-2" />
-                      Copy Professional Prompt
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
 
-          {/* Custom Structure Application Section */}
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-slate-700 mb-4">Custom Structure Application</h2>
-            
-            {/* Structure Template Management */}
-            <div className="mb-6">
-              <Card className="border-slate-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Settings className="w-5 h-5 text-orange-500" />
-                    <span>Manage Structure Templates</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Template Name</label>
-                      <Input
-                        placeholder="e.g., Blog Post Structure"
-                        value={newTemplateName}
-                        onChange={(e) => setNewTemplateName(e.target.value)}
-                      />
+                  {generatedPrompt && (
+                    <div className="flex space-x-2">
+                      <Button
+                        onClick={savePrompt}
+                        className="flex-1 bg-yellow-500 hover:bg-yellow-600"
+                      >
+                        <Send className="w-4 h-4 mr-2" />
+                        Save Prompt
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copyToClipboard(generatedPrompt)}
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Template Content</label>
-                      <Textarea
-                        placeholder="e.g., 1. Introduction 2. Main Points 3. Conclusion"
-                        value={newTemplateContent}
-                        onChange={(e) => setNewTemplateContent(e.target.value)}
-                        className="min-h-20 resize-none"
-                      />
-                    </div>
-                  </div>
-                  
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Main Input/Output Grid for Sentence Correction */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            {/* Input Card */}
+            <Card className="border-slate-200">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <MessageSquare className="w-5 h-5 text-blue-500" />
+                  <span>Original Sentence</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Textarea
+                  placeholder="Enter your sentence here to be corrected and improved..."
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  className="min-h-32 resize-none border-slate-200 focus:border-blue-500"
+                />
+                
+                <div className="flex items-center space-x-2">
                   <Button 
-                    onClick={saveStructureTemplate}
-                    disabled={isSavingTemplate || !newTemplateName.trim() || !newTemplateContent.trim()}
-                    className="bg-orange-500 hover:bg-orange-600"
+                    onClick={() => processSentence(false)}
+                    disabled={isProcessing || !inputText.trim() || hasReachedLimit}
+                    className="bg-blue-500 hover:bg-blue-600"
                   >
-                    {isSavingTemplate ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="w-4 h-4 mr-2" />
-                        Save Template
-                      </>
-                    )}
-                  </Button>
-                  
-                  {structureTemplates.length > 0 && (
-                    <div className="mt-4">
-                      <label className="text-sm font-medium mb-2 block">Saved Templates</label>
-                      <div className="space-y-2 max-h-32 overflow-y-auto">
-                        {structureTemplates.map((template) => (
-                          <div key={template.id} className="flex items-center justify-between p-2 bg-orange-50 border border-orange-200 rounded">
-                            <div>
-                              <p className="font-medium text-sm">{template.name}</p>
-                              <p className="text-xs text-slate-500 line-clamp-1">{template.template_content}</p>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => deleteStructureTemplate(template.id)}
-                              className="text-red-500 hover:text-red-700"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Structure Application */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Template Selection */}
-              <Card className="border-slate-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Settings className="w-5 h-5 text-blue-500" />
-                    <span>Select Template</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose a structure template" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {structureTemplates.map((template) => (
-                        <SelectItem key={template.id} value={template.id}>
-                          {template.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  
-                  {selectedTemplateId && (
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-sm text-blue-700 font-medium mb-1">Selected Template:</p>
-                      <p className="text-sm text-blue-600">
-                        {structureTemplates.find(t => t.id === selectedTemplateId)?.template_content}
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Structure Input Card */}
-              <Card className="border-slate-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Sparkles className="w-5 h-5 text-green-500" />
-                    <span>Content to Structure</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Textarea
-                    placeholder="Enter your content here to apply the selected structure..."
-                    value={structuredInputText}
-                    onChange={(e) => setStructuredInputText(e.target.value)}
-                    className="min-h-32 resize-none border-slate-200 focus:border-green-500"
-                  />
-                  
-                  <Button 
-                    onClick={processWithStructure}
-                    disabled={isProcessingStructured || !structuredInputText.trim() || !selectedTemplateId || hasReachedLimit}
-                    className="w-full bg-green-500 hover:bg-green-600"
-                  >
-                    {isProcessingStructured ? (
+                    {isProcessing ? (
                       <>
                         <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
                         Processing...
                       </>
                     ) : (
                       <>
-                        <Settings className="w-4 h-4 mr-2" />
-                        Apply Structure
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Correct with AI
                       </>
                     )}
                   </Button>
-                </CardContent>
-              </Card>
+                  <Button 
+                    variant="outline" 
+                    onClick={handleRefresh}
+                    disabled={isProcessing || !inputText.trim() || hasReachedLimit}
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
 
-              {/* Structure Output Card */}
-              <Card className="border-slate-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <CheckCircle className="w-5 h-5 text-emerald-500" />
-                    <span>Structured Content</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="min-h-32 p-4 bg-emerald-50 border border-emerald-200 rounded-lg mb-4">
-                    {structuredOutput ? (
-                      <div className="text-slate-800 whitespace-pre-wrap">{structuredOutput}</div>
-                    ) : (
-                      <p className="text-slate-400 italic">Structured content will appear here...</p>
-                    )}
-                  </div>
-                  
-                  {structuredOutput && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => copyToClipboard(structuredOutput)}
-                      className="w-full"
-                    >
-                      <Copy className="w-4 h-4 mr-2" />
-                      Copy Structured Content
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-
-          {/* Sentence Correction Section */}
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-slate-700 mb-4">Sentence Correction</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Input Card */}
-              <Card className="border-slate-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Sparkles className="w-5 h-5 text-blue-500" />
-                    <span>Original Text</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Textarea
-                    placeholder="Enter your sentence here... The quick brown fox jump over the lazy dog"
-                    value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                    className="min-h-32 resize-none border-slate-200 focus:border-blue-500"
-                  />
-                  
-                  <div className="flex items-center space-x-2">
-                    <Button 
-                      onClick={() => processSentence(false)}
-                      disabled={isProcessing || !inputText.trim() || hasReachedLimit}
-                      className="bg-blue-500 hover:bg-blue-600"
-                    >
-                      {isProcessing ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                          Processing...
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle className="w-4 h-4 mr-2" />
-                          Correct with AI
-                        </>
-                      )}
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => processSentence(true)}
-                      disabled={isProcessing || !inputText.trim() || hasReachedLimit}
-                    >
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                      Refresh
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Output Card */}
-              <Card className="border-slate-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <CheckCircle className="w-5 h-5 text-green-500" />
-                    <span>AI Corrected Text</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="min-h-32 p-4 bg-green-50 border border-green-200 rounded-lg mb-4">
-                    {correctedText ? (
-                      <div className="text-slate-800 whitespace-pre-wrap">{correctedText}</div>
-                    ) : (
-                      <p className="text-slate-400 italic">Corrected text will appear here...</p>
-                    )}
-                  </div>
-                  
-                  {correctedText && (
-                    <div className="space-y-3">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => copyToClipboard(correctedText)}
-                        className="w-full"
-                      >
-                        <Copy className="w-4 h-4 mr-2" />
-                        Copy Corrected Text
-                      </Button>
-                      
-                      {improvements.length > 0 && (
-                        <div className="mt-4">
-                          <h4 className="text-sm font-medium text-slate-700 mb-2">Improvements Made:</h4>
-                          <ul className="space-y-1">
-                            {improvements.map((improvement, index) => (
-                              <li key={index} className="text-sm text-slate-600 flex items-start space-x-2">
-                                <CheckCircle className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
-                                <span>{improvement}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-
-          {/* History Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Sentence History */}
+            {/* Output Card */}
             <Card className="border-slate-200">
               <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <History className="w-5 h-5 text-slate-600" />
-                    <span>Sentence History</span>
-                  </div>
-                  <Badge variant="secondary">
-                    {history.length} corrections
-                  </Badge>
+                <CardTitle className="flex items-center space-x-2">
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                  <span>AI Corrected Sentence</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {history.length === 0 ? (
-                  <div className="text-center py-8">
-                    <History className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                    <p className="text-slate-500 text-sm">No corrections yet</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {history.slice(0, 3).map((entry) => (
-                      <div key={entry.id} className="p-3 border border-slate-200 rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs text-slate-500">{entry.timestamp}</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => copyToClipboard(entry.correctedText)}
-                          >
-                            <Copy className="w-3 h-3" />
-                          </Button>
-                        </div>
-                        <div className="text-sm text-slate-600 line-clamp-2">{entry.correctedText}</div>
-                      </div>
-                    ))}
+                <div className="min-h-32 p-4 bg-green-50 border border-green-200 rounded-lg mb-4">
+                  {correctedText ? (
+                    <div className="text-slate-800 whitespace-pre-wrap">{correctedText}</div>
+                  ) : (
+                    <p className="text-slate-400 italic">Corrected sentence will appear here...</p>
+                  )}
+                </div>
+                
+                {correctedText && (
+                  <div className="flex space-x-2">
+                    <Button 
+                      onClick={saveSentence}
+                      className="flex-1 bg-green-500 hover:bg-green-600"
+                    >
+                      <Send className="w-4 h-4 mr-2" />
+                      Save Correction
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copyToClipboard(correctedText)}
+                    >
+                      <Copy className="w-4 h-4" />
+                    </Button>
                   </div>
                 )}
               </CardContent>
             </Card>
+          </div>
 
+          {/* History Sections */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Prompt History */}
             <Card className="border-slate-200">
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <MessageSquare className="w-5 h-5 text-purple-600" />
+                    <Lightbulb className="w-5 h-5 text-slate-600" />
                     <span>Prompt History</span>
                   </div>
                   <Badge variant="secondary">
@@ -791,24 +368,78 @@ Important: Provide only the professional prompt as plain text.`;
               <CardContent>
                 {promptHistory.length === 0 ? (
                   <div className="text-center py-8">
-                    <MessageSquare className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                    <p className="text-slate-500 text-sm">No prompts yet</p>
+                    <Lightbulb className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                    <p className="text-slate-500 text-sm">No prompts generated yet</p>
                   </div>
                 ) : (
-                  <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {promptHistory.slice(0, 3).map((entry) => (
-                      <div key={entry.id} className="p-3 border border-slate-200 rounded-lg">
+                  <div className="space-y-3 max-h-64 overflow-y-auto">
+                    {promptHistory.map((prompt) => (
+                      <div 
+                        key={prompt.id}
+                        className="p-3 border border-slate-200 rounded"
+                      >
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs text-slate-500">{entry.timestamp}</span>
+                          <span className="text-xs text-slate-500">{prompt.createdAt}</span>
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
-                            onClick={() => copyToClipboard(entry.correctedPrompt)}
+                            onClick={() => copyToClipboard(prompt.generatedPrompt)}
                           >
                             <Copy className="w-3 h-3" />
                           </Button>
                         </div>
-                        <div className="text-sm text-slate-600 line-clamp-2">{entry.correctedPrompt}</div>
+                        <p className="text-xs font-medium text-yellow-700 mb-1">Keywords: {prompt.keywords}</p>
+                        <div className="bg-yellow-50 p-2 rounded text-xs text-yellow-800">
+                          {prompt.generatedPrompt.substring(0, 100)}...
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Correction History */}
+            <Card className="border-slate-200">
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle className="w-5 h-5 text-slate-600" />
+                    <span>Correction History</span>
+                  </div>
+                  <Badge variant="secondary">
+                    {corrections.length} corrections
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {corrections.length === 0 ? (
+                  <div className="text-center py-8">
+                    <MessageSquare className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                    <p className="text-slate-500 text-sm">No corrections yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-64 overflow-y-auto">
+                    {corrections.map((correction) => (
+                      <div 
+                        key={correction.id}
+                        className="p-3 border border-slate-200 rounded"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-slate-500">{correction.createdAt}</span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => copyToClipboard(correction.correctedText)}
+                          >
+                            <Copy className="w-3 h-3" />
+                          </Button>
+                        </div>
+                        
+                        <div className="bg-green-50 p-2 rounded text-xs">
+                          <p className="font-medium text-green-700 mb-1">Corrected:</p>
+                          <div className="text-green-800">{correction.correctedText}</div>
+                        </div>
                       </div>
                     ))}
                   </div>

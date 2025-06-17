@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,6 +15,7 @@ import { TodaysUpdate } from "./components/TodaysUpdate";
 import NotFound from "./pages/NotFound";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import VersionControlPage from "./pages/VersionControlPage";
+import { StructureTemplatesPage } from "./pages/StructureTemplatesPage";
 import PaymentPage from "./pages/PaymentPage";
 import { Layout } from "@/components/Layout";
 import React from "react";
@@ -97,6 +99,16 @@ const App = () => (
                   <ProtectedRoute>
                     <Layout>
                       <TodaysUpdate />
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/structure-templates" 
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <StructureTemplatesPage />
                     </Layout>
                   </ProtectedRoute>
                 } 

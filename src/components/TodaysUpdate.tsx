@@ -1,11 +1,12 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, MessageSquare, RefreshCw, Copy, Send } from 'lucide-react';
+import { Calendar, MessageSquare, RefreshCw, Copy, Send, Github } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { formatDailyUpdateWithAI } from '@/services/openaiService';
+import { formatDailyUpdateWithAI, generateCommitMessageWithAI } from '@/services/openaiService';
 import { Layout } from '@/components/Layout';
 import { useUsageTracking } from '@/hooks/useUsageTracking';
 
@@ -21,6 +22,9 @@ export const TodaysUpdate = () => {
   const [formattedUpdate, setFormattedUpdate] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [dailyUpdates, setDailyUpdates] = useState<DailyUpdate[]>([]);
+  const [commitSummary, setCommitSummary] = useState('');
+  const [commitMessage, setCommitMessage] = useState('');
+  const [isCommitGenerating, setIsCommitGenerating] = useState(false);
   const { incrementUsage, hasReachedLimit } = useUsageTracking();
 
   const processUpdate = async (isRefresh: boolean = false) => {
@@ -69,6 +73,50 @@ export const TodaysUpdate = () => {
     }
   };
 
+  const processCommitMessage = async () => {
+    if (!commitSummary.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a summary or details to generate a commit message.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (hasReachedLimit) {
+      toast({
+        title: "Usage Limit Reached",
+        description: "You've reached your usage limit. Please upgrade to continue.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsCommitGenerating(true);
+    try {
+      // Track usage before making API call
+      const usageSuccess = await incrementUsage('commit_message_generation');
+      if (!usageSuccess) {
+        return; // Usage tracking will show the appropriate error
+      }
+
+      const result = await generateCommitMessageWithAI(commitSummary);
+      setCommitMessage(result);
+      toast({
+        title: "Commit Message Generated!",
+        description: "Your professional commit message is ready.",
+      });
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to generate commit message.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCommitGenerating(false);
+    }
+  };
+
   const handleRefresh = () => {
     processUpdate(true);
   };
@@ -95,7 +143,16 @@ export const TodaysUpdate = () => {
     navigator.clipboard.writeText(text);
     toast({
       title: "Copied!",
-      description: "Update copied to clipboard.",
+      description: "Text copied to clipboard.",
+    });
+  };
+
+  const copyCommitMessage = () => {
+    if (!commitMessage) return;
+    navigator.clipboard.writeText(commitMessage);
+    toast({
+      title: "Copied!",
+      description: "Commit message copied to clipboard.",
     });
   };
 
@@ -106,7 +163,7 @@ export const TodaysUpdate = () => {
           {/* Header Section */}
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-slate-800 mb-2">Today's Update</h1>
-            <p className="text-slate-600">Format your daily updates with AI-powered structure and correction</p>
+            <p className="text-slate-600">Format your daily updates and generate commit messages with AI</p>
           </div>
 
           {/* Main Input/Output Grid */}
@@ -195,6 +252,62 @@ export const TodaysUpdate = () => {
               </CardContent>
             </Card>
           </div>
+
+          {/* Git Commit Message Section */}
+          <Card className="border-slate-200 mb-8">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Github className="w-5 h-5 text-violet-700" />
+                <span>AI Generated Commit Message</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-slate-700 mb-2 block">
+                  Commit Details / Summary
+                </label>
+                <Textarea
+                  placeholder="Describe what your commit does..."
+                  value={commitSummary}
+                  onChange={(e) => setCommitSummary(e.target.value)}
+                  className="min-h-20 resize-none border-slate-200 focus:border-violet-500"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={processCommitMessage}
+                  disabled={isCommitGenerating || !commitSummary.trim() || hasReachedLimit}
+                  className="bg-violet-700 hover:bg-violet-800"
+                >
+                  {isCommitGenerating ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Github className="w-4 h-4 mr-2" />
+                      Generate Commit Message
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={copyCommitMessage}
+                  disabled={!commitMessage}
+                >
+                  <Copy className="w-4 h-4" />
+                  Copy
+                </Button>
+              </div>
+              {commitMessage && (
+                <div className="bg-gray-50 border border-gray-200 rounded px-4 py-3">
+                  <span className="font-mono text-green-800">{commitMessage}</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* History Section */}
           <Card className="border-slate-200">

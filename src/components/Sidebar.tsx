@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Users, Calendar, Briefcase, GitBranch } from 'lucide-react';
+import { CheckCircle, Users, Calendar, Briefcase, GitBranch, FileText } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { usePaidStatus } from '@/contexts/PaidStatusContext';
 
@@ -16,6 +17,13 @@ export const Sidebar = () => {
       icon: CheckCircle,
       description: 'Instant AI correction',
       path: '/correct-sentence'
+    },
+    {
+      id: 'structure-templates',
+      label: 'Structure Templates',
+      icon: FileText,
+      description: 'Custom formatting',
+      path: '/structure-templates'
     },
     {
       id: 'client-update',
