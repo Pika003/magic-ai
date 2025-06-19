@@ -172,100 +172,98 @@ export const ProjectsPage = () => {
   };
 
   return (
-    <Layout>
-      <div className="w-full px-2 md:px-4 pt-10">
-        <div className="max-w-7xl mx-auto">
-          {/* Header Section */}
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-3xl font-bold text-slate-800">Projects</h1>
-              <p className="text-slate-600 mt-1">Manage your client projects and track progress</p>
-            </div>
-            <Button onClick={openCreateForm} className="bg-blue-500 hover:bg-blue-600">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              New Project
-            </Button>
+    <div className="w-full px-2 md:px-4 pt-10">
+      <div className="max-w-7xl mx-auto">
+        {/* Header Section */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-800">Projects</h1>
+            <p className="text-slate-600 mt-1">Manage your client projects and track progress</p>
           </div>
-
-          {/* Search and Filter Section */}
-          <div className="flex gap-4 items-center mb-8">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Search projects..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 border-slate-200 focus:border-blue-500"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px] border-slate-200">
-                <Filter className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="on_hold">On Hold</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Content Section */}
-          {loading ? (
-            <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-              <p className="text-gray-500">Loading projects...</p>
-            </div>
-          ) : filteredProjects.length === 0 ? (
-            <div className="text-center py-16">
-              <div className="bg-white p-8 rounded-lg shadow-sm border border-slate-200">
-                <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <PlusCircle className="w-8 h-8 text-slate-400" />
-                </div>
-                <h2 className="text-xl font-semibold mb-2 text-slate-800">
-                  {projects.length === 0 ? 'No projects yet' : 'No projects match your filters'}
-                </h2>
-                <p className="text-slate-600 mb-6 max-w-md mx-auto">
-                  {projects.length === 0 
-                    ? 'Create your first project to get started with client management and updates.'
-                    : 'Try adjusting your search or filter criteria to find what you\'re looking for.'
-                  }
-                </p>
-                {projects.length === 0 && (
-                  <Button onClick={openCreateForm} className="bg-blue-500 hover:bg-blue-600">
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Create Your First Project
-                  </Button>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredProjects.map((project) => (
-                <ProjectCard
-                  key={project.id}
-                  project={project}
-                  onEdit={openEditForm}
-                  onDelete={handleDeleteProject}
-                  onSendUpdate={handleSendUpdate}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Project Form Modal */}
-          <ProjectForm
-            open={formOpen}
-            onOpenChange={setFormOpen}
-            onSubmit={editingProject ? handleEditProject : handleCreateProject}
-            project={editingProject}
-            loading={formLoading}
-          />
+          <Button onClick={openCreateForm} className="bg-blue-500 hover:bg-blue-600">
+            <PlusCircle className="mr-2 h-4 w-4" />
+            New Project
+          </Button>
         </div>
+
+        {/* Search and Filter Section */}
+        <div className="flex gap-4 items-center mb-8">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Input
+              placeholder="Search projects..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 border-slate-200 focus:border-blue-500"
+            />
+          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[180px] border-slate-200">
+              <Filter className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="on_hold">On Hold</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Content Section */}
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p className="text-gray-500">Loading projects...</p>
+          </div>
+        ) : filteredProjects.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="bg-white p-8 rounded-lg shadow-sm border border-slate-200">
+              <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <PlusCircle className="w-8 h-8 text-slate-400" />
+              </div>
+              <h2 className="text-xl font-semibold mb-2 text-slate-800">
+                {projects.length === 0 ? 'No projects yet' : 'No projects match your filters'}
+              </h2>
+              <p className="text-slate-600 mb-6 max-w-md mx-auto">
+                {projects.length === 0 
+                  ? 'Create your first project to get started with client management and updates.'
+                  : 'Try adjusting your search or filter criteria to find what you\'re looking for.'
+                }
+              </p>
+              {projects.length === 0 && (
+                <Button onClick={openCreateForm} className="bg-blue-500 hover:bg-blue-600">
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Create Your First Project
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredProjects.map((project) => (
+              <ProjectCard
+                key={project.id}
+                project={project}
+                onEdit={openEditForm}
+                onDelete={handleDeleteProject}
+                onSendUpdate={handleSendUpdate}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Project Form Modal */}
+        <ProjectForm
+          open={formOpen}
+          onOpenChange={setFormOpen}
+          onSubmit={editingProject ? handleEditProject : handleCreateProject}
+          project={editingProject}
+          loading={formLoading}
+        />
       </div>
-    </Layout>
+    </div>
   );
 };

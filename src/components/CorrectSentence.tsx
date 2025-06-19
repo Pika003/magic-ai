@@ -178,9 +178,8 @@ export const CorrectSentence = () => {
   };
 
   return (
-    <Layout>
-      <div className="w-full px-2 md:px-4 pt-10">
-        <div className="max-w-7xl mx-auto">
+      <div className="w-full px-2 md:px-4 pt-10 pl-0 ml-0">
+        <div className="w-full mx-auto">
           {/* Header Section */}
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-slate-800 mb-2">AI Content Tools</h1>
@@ -449,6 +448,5 @@ export const CorrectSentence = () => {
           </div>
         </div>
       </div>
-    </Layout>
   );
 };
