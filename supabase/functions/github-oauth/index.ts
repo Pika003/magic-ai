@@ -10,7 +10,7 @@ const corsHeaders = {
 const GITHUB_CLIENT_ID = Deno.env.get("GITHUB_CLIENT_ID");
 const GITHUB_CLIENT_SECRET = Deno.env.get("GITHUB_CLIENT_SECRET");
 const APP_URL = Deno.env.get("APP_URL") || "https://wrvobkcgxmemexernxne.supabase.co";
-const FRONTEND_URL = "https://preview--sentence-scribe-ai-magic.lovable.app";
+const FRONTEND_URL = "https://magicaidevops.netlify.app";
 
 // Helper to parse JWT and extract fields
 function parseJwt(token: string) {

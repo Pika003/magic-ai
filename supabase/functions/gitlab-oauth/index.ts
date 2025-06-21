@@ -9,7 +9,7 @@ const corsHeaders = {
 const GITLAB_CLIENT_ID = Deno.env.get("GITLAB_CLIENT_ID");
 const GITLAB_CLIENT_SECRET = Deno.env.get("GITLAB_CLIENT_SECRET");
 const APP_URL = Deno.env.get("APP_URL") || "https://wrvobkcgxmemexernxne.supabase.co";
-const FRONTEND_URL = "https://preview--sentence-scribe-ai-magic.lovable.app";
+const FRONTEND_URL = "https://magicaidevops.netlify.app";
 
 function parseJwt(token: string) {
   const base64Url = token.split('.')[1];

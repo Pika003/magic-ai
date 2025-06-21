@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +10,7 @@ import { Layout } from '@/components/Layout';
 import { useUsageTracking } from '@/hooks/useUsageTracking';
 import { sendSlackMessage, fetchSlackChannels } from '@/services/slackService';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Select, SelectItem } from '@/components/ui/select';
+import { Select, SelectItem, SelectTrigger, SelectContent } from '@/components/ui/select';
 
 interface DailyUpdate {
   id: string;
@@ -32,6 +32,31 @@ export const TodaysUpdate = () => {
   const [slackChannels, setSlackChannels] = useState<any[]>([]);
   const [selectedChannel, setSelectedChannel] = useState('');
   const [isSendingSlack, setIsSendingSlack] = useState(false);
+  const [userToken, setUserToken] = useState<string | null>(null);
+  const [isSlackConnected, setIsSlackConnected] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tokenFromUrl = params.get('slack_user_token');
+    if (tokenFromUrl) {
+      setUserToken(tokenFromUrl);
+      setIsSlackConnected(true);
+      localStorage.setItem('slack_user_token', tokenFromUrl);
+      // Remove token from URL for cleanliness
+      params.delete('slack_user_token');
+      window.history.replaceState({}, document.title, window.location.pathname + (params.toString() ? '?' + params.toString() : ''));
+    } else {
+      const tokenFromStorage = localStorage.getItem('slack_user_token');
+      if (tokenFromStorage) {
+        setUserToken(tokenFromStorage);
+        setIsSlackConnected(true);
+      }
+    }
+  }, []);
+
+  const handleConnectSlack = () => {
+    window.open('https://battleship-8p92.onrender.com/slack/oauth/start', '_self');
+  };
 
   const processUpdate = async (isRefresh: boolean = false) => {
     if (!inputText.trim()) {
@@ -181,7 +206,7 @@ export const TodaysUpdate = () => {
     }
     setIsSendingSlack(true);
     try {
-      await sendSlackMessage({ channel: selectedChannel, text: formattedUpdate });
+      await sendSlackMessage({ channel: selectedChannel, text: formattedUpdate, userToken: userToken });
       toast({ title: 'Sent!', description: 'Update sent to Slack successfully.' });
       setIsSlackDialogOpen(false);
     } catch (e: any) {
@@ -198,6 +223,18 @@ export const TodaysUpdate = () => {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-slate-800 mb-2">Today's Update</h1>
           <p className="text-slate-600">Format your daily updates and generate commit messages with AI</p>
+          {!isSlackConnected && (
+            <button onClick={handleConnectSlack} className="mt-4 bg-[#4A154B] hover:bg-[#350d36] text-white px-4 py-2 rounded">
+              <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/slack.svg" alt="Slack" className="w-5 h-5 mr-2 inline" />
+              Connect Slack
+            </button>
+          )}
+          {isSlackConnected && (
+            <div className="mt-4 text-green-600 font-medium flex items-center justify-center gap-2">
+              <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/slack.svg" alt="Slack" className="w-5 h-5 inline" />
+              Slack Connected
+            </div>
+          )}
         </div>
 
         {/* Main Input/Output Grid */}
@@ -409,10 +446,14 @@ export const TodaysUpdate = () => {
           </DialogHeader>
           <div className="mb-4">
             <Select value={selectedChannel} onValueChange={setSelectedChannel}>
-              <option value="">Select a channel or user</option>
-              {slackChannels.map((ch) => (
-                <SelectItem key={ch.id} value={ch.id}>{ch.name || ch.real_name}</SelectItem>
-              ))}
+              <SelectTrigger>
+                <span>{selectedChannel ? slackChannels.find(ch => ch.id === selectedChannel)?.name || slackChannels.find(ch => ch.id === selectedChannel)?.real_name : 'Select a channel or user'}</span>
+              </SelectTrigger>
+              <SelectContent>
+                {slackChannels.map((ch) => (
+                  <SelectItem key={ch.id} value={ch.id}>{ch.name || ch.real_name}</SelectItem>
+                ))}
+              </SelectContent>
             </Select>
           </div>
           <Button onClick={handleSendToSlack} disabled={isSendingSlack || !selectedChannel} className="w-full bg-blue-600 hover:bg-blue-700">
