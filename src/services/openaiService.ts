@@ -2,10 +2,14 @@ import { supabase } from '@/integrations/supabase/client';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const { data: { session }, error } = await supabase.auth.getSession();
-const token = session?.access_token;;
+
+const getToken = async () => {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.access_token;
+};
 
 export const correctSentenceWithAI = async (sentence: string, isRefresh: boolean = false): Promise<string> => {
+  const token = await getToken();
   const response = await fetch(`${supabaseUrl}/functions/v1/get-openai-key`, {
     method: 'POST',
     headers: {
@@ -28,6 +32,7 @@ export const correctSentenceWithAI = async (sentence: string, isRefresh: boolean
 };
 
 export const generateProfessionalPromptWithAI = async (keywords: string): Promise<string> => {
+  const token = await getToken();
   const response = await fetch(`${supabaseUrl}/functions/v1/get-openai-key`, {
     method: 'POST',
     headers: {
@@ -49,6 +54,7 @@ export const generateProfessionalPromptWithAI = async (keywords: string): Promis
 };
 
 export const generateClientUpdateWithAI = async (message: string, clientName: string, liveLink: string, yourName: string, isRefresh: boolean = false): Promise<string> => {
+  const token = await getToken();
   const response = await fetch(`${supabaseUrl}/functions/v1/get-openai-key`, {
     method: 'POST',
     headers: {
@@ -74,6 +80,7 @@ export const generateClientUpdateWithAI = async (message: string, clientName: st
 };
 
 export const formatDailyUpdateWithAI = async (updateText: string, isRefresh: boolean = false): Promise<string> => {
+  const token = await getToken();
   const response = await fetch(`${supabaseUrl}/functions/v1/get-openai-key`, {
     method: 'POST',
     headers: {
@@ -96,6 +103,7 @@ export const formatDailyUpdateWithAI = async (updateText: string, isRefresh: boo
 };
 
 export const generateCommitMessageWithAI = async (commitSummary: string): Promise<string> => {
+  const token = await getToken();
   const response = await fetch(`${supabaseUrl}/functions/v1/get-openai-key`, {
     method: 'POST',
     headers: {
@@ -117,6 +125,7 @@ export const generateCommitMessageWithAI = async (commitSummary: string): Promis
 };
 
 export const formatWithStructureTemplate = async (content: string, template: string): Promise<string> => {
+  const token = await getToken();
   const response = await fetch(`${supabaseUrl}/functions/v1/get-openai-key`, {
     method: 'POST',
     headers: {
