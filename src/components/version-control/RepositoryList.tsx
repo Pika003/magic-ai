@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Github, Gitlab, Copy } from 'lucide-react';
 import { GitHubRepository, GitLabProject } from '@/services/versionControlService';
 import { toast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 
 interface RepositoryListProps {
   githubRepos?: GitHubRepository[];
@@ -24,6 +24,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   activeTab,
   error,
 }) => {
+  const navigate = useNavigate();
+
   // Early error display
   if (error) return <div className="text-red-500">{error}</div>;
 
@@ -59,7 +61,11 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {githubRepos.map((repo) => (
-          <Card key={repo.id}>
+          <Card
+            key={repo.id}
+            className="cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => navigate(`/version-control/github/${repo.id}`)}
+          >
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg flex items-center gap-2">
@@ -160,7 +166,11 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {gitlabProjects.map((project) => (
-        <Card key={project.id}>
+        <Card
+          key={project.id}
+          className="cursor-pointer hover:shadow-lg transition-shadow"
+          onClick={() => navigate(`/version-control/gitlab/${project.id}`)}
+        >
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">

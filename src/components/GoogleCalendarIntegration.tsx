@@ -153,8 +153,8 @@ export const GoogleCalendarIntegration = () => {
               ) : (
                 <div className="space-y-2">
                   {upcomingEvents.map((event) => (
-                    <div 
-                      key={event.id} 
+                    <div
+                      key={event.id}
                       className="p-3 bg-slate-50 rounded-lg border border-slate-200"
                     >
                       <div className="flex items-start justify-between">
@@ -162,15 +162,16 @@ export const GoogleCalendarIntegration = () => {
                           <h5 className="font-medium text-slate-800 text-sm">
                             {event.title}
                           </h5>
-                          <div className="flex items-center space-x-3 mt-1">
-                            <div className="flex items-center space-x-1 text-xs text-slate-500">
-                              <Clock className="w-3 h-3" />
-                              <span>
-                                {formatTime(event.start)} - {formatTime(event.end)}
-                              </span>
-                            </div>
+                          <div className="flex items-center space-x-3 mt-1 text-xs text-slate-500">
+                            <Clock className="w-3 h-3" />
+                            <span>
+                              {formatTime(event.start)} - {formatTime(event.end)}
+                            </span>
+                            <span className="ml-2">
+                              {new Date(event.start).toLocaleDateString()}
+                            </span>
                             {event.location && (
-                              <div className="flex items-center space-x-1 text-xs text-slate-500">
+                              <div className="flex items-center space-x-1">
                                 <MapPin className="w-3 h-3" />
                                 <span>{event.location}</span>
                               </div>
@@ -200,7 +201,7 @@ export const GoogleCalendarIntegration = () => {
           </div>
         )}
 
-        <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+        {/* <div className="mt-4 p-3 bg-blue-50 rounded-lg">
           <div className="flex items-start space-x-2">
             <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5" />
             <div className="text-xs text-blue-700">
@@ -208,7 +209,7 @@ export const GoogleCalendarIntegration = () => {
               <p>Make sure to configure your Google Cloud OAuth credentials with your actual Client ID and add your domain to authorized origins.</p>
             </div>
           </div>
-        </div>
+        </div> */}
       </CardContent>
     </Card>
   );

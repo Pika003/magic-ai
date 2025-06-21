@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -20,6 +19,7 @@ import PaymentPage from "./pages/PaymentPage";
 import { Layout } from "@/components/Layout";
 import React from "react";
 import { PaidStatusProvider, usePaidStatus } from "./contexts/PaidStatusContext";
+import RepoDetailsPage from "./pages/RepoDetailsPage";
 
 // PaidUserRoute: Now connected to PaidStatusContext and never stales
 const PaidUserRoute = ({ children }: { children: React.ReactNode }) => {
@@ -139,6 +139,26 @@ const App = () => (
                   <ProtectedRoute>
                     <Layout>
                       <VersionControlPage />
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/version-control/github/:id"
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <RepoDetailsPage />
+                    </Layout>
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/version-control/gitlab/:id"
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <RepoDetailsPage />
                     </Layout>
                   </ProtectedRoute>
                 } 

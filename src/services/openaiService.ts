@@ -2,13 +2,15 @@ import { supabase } from '@/integrations/supabase/client';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const { data: { session }, error } = await supabase.auth.getSession();
+const token = session?.access_token;;
 
 export const correctSentenceWithAI = async (sentence: string, isRefresh: boolean = false): Promise<string> => {
   const response = await fetch(`${supabaseUrl}/functions/v1/get-openai-key`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${supabaseAnonKey}`
+      'Authorization': `Bearer ${token}`
     },
     body: JSON.stringify({
       sentence: sentence,
@@ -30,7 +32,7 @@ export const generateProfessionalPromptWithAI = async (keywords: string): Promis
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${supabaseAnonKey}`
+      'Authorization': `Bearer ${token}`
     },
     body: JSON.stringify({
       keywords: keywords,
@@ -51,7 +53,7 @@ export const generateClientUpdateWithAI = async (message: string, clientName: st
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${supabaseAnonKey}`
+      'Authorization': `Bearer ${token}`
     },
     body: JSON.stringify({
       message: message,
@@ -76,7 +78,7 @@ export const formatDailyUpdateWithAI = async (updateText: string, isRefresh: boo
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${supabaseAnonKey}`
+      'Authorization': `Bearer ${token}`
     },
     body: JSON.stringify({
       updateText: updateText,
@@ -98,7 +100,7 @@ export const generateCommitMessageWithAI = async (commitSummary: string): Promis
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${supabaseAnonKey}`
+      'Authorization': `Bearer ${token}`
     },
     body: JSON.stringify({
       commitSummary: commitSummary,
@@ -119,7 +121,7 @@ export const formatWithStructureTemplate = async (content: string, template: str
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${supabaseAnonKey}`
+      'Authorization': `Bearer ${token}`
     },
     body: JSON.stringify({
       content: content,

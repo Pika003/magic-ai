@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -96,12 +95,15 @@ export const VersionControlPage = () => {
           title: `Successfully connected to ${provider}`,
           description: `Your ${provider} account has been connected.`,
         });
-        
+
+        // If GitLab was just connected, switch to the GitLab tab
+        if (provider === 'gitlab') {
+          setActiveTab('gitlab');
+        }
         // Check connections after successful OAuth
         const timer = setTimeout(() => {
           checkConnections();
         }, 1000);
-        
         // Clean up URL after processing
         const navigateTimer = setTimeout(() => {
           navigate(location.pathname, { replace: true });
@@ -117,12 +119,10 @@ export const VersionControlPage = () => {
           description: message || 'An unknown error occurred.',
           variant: 'destructive',
         });
-        
         // Clean up URL after error
         const timer = setTimeout(() => {
           navigate(location.pathname, { replace: true });
         }, 2000);
-
         return () => clearTimeout(timer);
       }
     }

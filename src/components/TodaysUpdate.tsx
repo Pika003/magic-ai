@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,6 +8,9 @@ import { toast } from '@/hooks/use-toast';
 import { formatDailyUpdateWithAI, generateCommitMessageWithAI } from '@/services/openaiService';
 import { Layout } from '@/components/Layout';
 import { useUsageTracking } from '@/hooks/useUsageTracking';
+import { sendSlackMessage, fetchSlackChannels } from '@/services/slackService';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectItem } from '@/components/ui/select';
 
 interface DailyUpdate {
   id: string;
@@ -26,6 +28,10 @@ export const TodaysUpdate = () => {
   const [commitMessage, setCommitMessage] = useState('');
   const [isCommitGenerating, setIsCommitGenerating] = useState(false);
   const { incrementUsage, hasReachedLimit } = useUsageTracking();
+  const [isSlackDialogOpen, setIsSlackDialogOpen] = useState(false);
+  const [slackChannels, setSlackChannels] = useState<any[]>([]);
+  const [selectedChannel, setSelectedChannel] = useState('');
+  const [isSendingSlack, setIsSendingSlack] = useState(false);
 
   const processUpdate = async (isRefresh: boolean = false) => {
     if (!inputText.trim()) {
@@ -156,6 +162,35 @@ export const TodaysUpdate = () => {
     });
   };
 
+  const openSlackDialog = async () => {
+    setIsSlackDialogOpen(true);
+    if (slackChannels.length === 0) {
+      try {
+        const channels = await fetchSlackChannels();
+        setSlackChannels(channels);
+      } catch (e) {
+        toast({ title: 'Error', description: 'Failed to fetch Slack channels', variant: 'destructive' });
+      }
+    }
+  };
+
+  const handleSendToSlack = async () => {
+    if (!selectedChannel) {
+      toast({ title: 'Error', description: 'Please select a Slack channel or user', variant: 'destructive' });
+      return;
+    }
+    setIsSendingSlack(true);
+    try {
+      await sendSlackMessage({ channel: selectedChannel, text: formattedUpdate });
+      toast({ title: 'Sent!', description: 'Update sent to Slack successfully.' });
+      setIsSlackDialogOpen(false);
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message || 'Failed to send to Slack', variant: 'destructive' });
+    } finally {
+      setIsSendingSlack(false);
+    }
+  };
+
   return (
     <div className="w-full px-2 md:px-4 pt-10">
       <div className="max-w-7xl mx-auto">
@@ -245,6 +280,15 @@ export const TodaysUpdate = () => {
                     onClick={() => copyToClipboard(formattedUpdate)}
                   >
                     <Copy className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={openSlackDialog}
+                    disabled={isProcessing || !formattedUpdate}
+                  >
+                    <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/slack.svg" alt="Slack" className="w-4 h-4 mr-1 inline" />
+                    Send to Slack
                   </Button>
                 </div>
               )}
@@ -357,6 +401,25 @@ export const TodaysUpdate = () => {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={isSlackDialogOpen} onOpenChange={setIsSlackDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send Update to Slack</DialogTitle>
+          </DialogHeader>
+          <div className="mb-4">
+            <Select value={selectedChannel} onValueChange={setSelectedChannel}>
+              <option value="">Select a channel or user</option>
+              {slackChannels.map((ch) => (
+                <SelectItem key={ch.id} value={ch.id}>{ch.name || ch.real_name}</SelectItem>
+              ))}
+            </Select>
+          </div>
+          <Button onClick={handleSendToSlack} disabled={isSendingSlack || !selectedChannel} className="w-full bg-blue-600 hover:bg-blue-700">
+            {isSendingSlack ? 'Sending...' : 'Send'}
+          </Button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
