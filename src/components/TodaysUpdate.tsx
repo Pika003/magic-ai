@@ -36,21 +36,10 @@ export const TodaysUpdate = () => {
   const [isSlackConnected, setIsSlackConnected] = useState(false);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const tokenFromUrl = params.get('slack_user_token');
-    if (tokenFromUrl) {
-      setUserToken(tokenFromUrl);
+    const tokenFromStorage = localStorage.getItem('slack_user_token');
+    if (tokenFromStorage) {
+      setUserToken(tokenFromStorage);
       setIsSlackConnected(true);
-      localStorage.setItem('slack_user_token', tokenFromUrl);
-      // Remove token from URL for cleanliness
-      params.delete('slack_user_token');
-      window.history.replaceState({}, document.title, window.location.pathname + (params.toString() ? '?' + params.toString() : ''));
-    } else {
-      const tokenFromStorage = localStorage.getItem('slack_user_token');
-      if (tokenFromStorage) {
-        setUserToken(tokenFromStorage);
-        setIsSlackConnected(true);
-      }
     }
   }, []);
 

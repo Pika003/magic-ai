@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Navigation } from '@/components/Navigation';
 import { LandingPage } from '@/components/LandingPage';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,12 +8,36 @@ const Index = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
+  const [userToken, setUserToken] = useState<string | null>(null);
+  const [isSlackConnected, setIsSlackConnected] = useState(false);
+
+
   // This effect must always be called
   React.useEffect(() => {
     if (user && !loading) {
       navigate('/correct-sentence');
     }
   }, [user, loading, navigate]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tokenFromUrl = params.get('slack_user_token');
+    if (tokenFromUrl) {
+      setUserToken(tokenFromUrl);
+      setIsSlackConnected(true);
+      localStorage.setItem('slack_user_token', tokenFromUrl);
+      // Clean up the URL
+      params.delete('slack_user_token');
+      window.history.replaceState({}, document.title, window.location.pathname + (params.toString() ? '?' + params.toString() : ''));
+    } else {
+      // If not in URL, check localStorage
+      const tokenFromStorage = localStorage.getItem('slack_user_token');
+      if (tokenFromStorage) {
+        setUserToken(tokenFromStorage);
+        setIsSlackConnected(true);
+      }
+    }
+  }, []);
 
   if (loading) {
     return (
