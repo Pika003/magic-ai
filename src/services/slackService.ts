@@ -44,5 +44,5 @@ export const fetchSlackAllUsers = async () => {
   if (!response.data.ok) {
     throw new Error(response.data.error || 'Failed to fetch Slack all Users');
   }
-  return response.data.channels;
+  return response.data;
 };

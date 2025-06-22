@@ -461,11 +461,11 @@ export const TodaysUpdate = () => {
                     : 'Select a channel or user'}
                 </span>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-72 overflow-y-auto">
                 <div className="px-2 py-1 text-xs text-gray-500 font-semibold">Channels</div>
                 {slackChannels.map((ch) => (
                   <SelectItem key={ch.id} value={ch.id}>
-                    {ch.is_private ? '🔒 ' : '#'}{ch.name}
+                    {ch.is_private ? ' ' : '#'}{ch.name}
                   </SelectItem>
                 ))}
                 <div className="px-2 py-1 text-xs text-gray-500 font-semibold mt-2">Users</div>
