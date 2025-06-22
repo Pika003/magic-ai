@@ -8,7 +8,7 @@ import { toast } from '@/hooks/use-toast';
 import { formatDailyUpdateWithAI, generateCommitMessageWithAI } from '@/services/openaiService';
 import { Layout } from '@/components/Layout';
 import { useUsageTracking } from '@/hooks/useUsageTracking';
-import { sendSlackMessage, fetchSlackChannels } from '@/services/slackService';
+import { sendSlackMessage, fetchSlackChannels, fetchSlackAllUsers } from '@/services/slackService';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectItem, SelectTrigger, SelectContent } from '@/components/ui/select';
 
@@ -30,6 +30,7 @@ export const TodaysUpdate = () => {
   const { incrementUsage, hasReachedLimit } = useUsageTracking();
   const [isSlackDialogOpen, setIsSlackDialogOpen] = useState(false);
   const [slackChannels, setSlackChannels] = useState<any[]>([]);
+  const [slackUsers, setSlackUsers] = useState<any[]>([]);
   const [selectedChannel, setSelectedChannel] = useState('');
   const [isSendingSlack, setIsSendingSlack] = useState(false);
   const [userToken, setUserToken] = useState<string | null>(null);
@@ -184,6 +185,20 @@ export const TodaysUpdate = () => {
         setSlackChannels(channels);
       } catch (e) {
         toast({ title: 'Error', description: 'Failed to fetch Slack channels', variant: 'destructive' });
+      }
+    }
+    if (slackUsers.length === 0) {
+      try {
+        const usersResp = await fetchSlackAllUsers();
+        if (usersResp.ok && Array.isArray(usersResp.members)) {
+          // Filter out bots and deleted users if needed
+          const filteredUsers = usersResp.members.filter(
+            (u: any) => !u.deleted && !u.is_bot && u.id !== 'USLACKBOT'
+          );
+          setSlackUsers(filteredUsers);
+        }
+      } catch (e) {
+        toast({ title: 'Error', description: 'Failed to fetch Slack users', variant: 'destructive' });
       }
     }
   };
@@ -436,11 +451,28 @@ export const TodaysUpdate = () => {
           <div className="mb-4">
             <Select value={selectedChannel} onValueChange={setSelectedChannel}>
               <SelectTrigger>
-                <span>{selectedChannel ? slackChannels.find(ch => ch.id === selectedChannel)?.name || slackChannels.find(ch => ch.id === selectedChannel)?.real_name : 'Select a channel or user'}</span>
+                <span>
+                  {selectedChannel
+                    ? (
+                        slackChannels.find(ch => ch.id === selectedChannel)?.name ||
+                        slackUsers.find(u => u.id === selectedChannel)?.real_name ||
+                        slackUsers.find(u => u.id === selectedChannel)?.name
+                      )
+                    : 'Select a channel or user'}
+                </span>
               </SelectTrigger>
               <SelectContent>
+                <div className="px-2 py-1 text-xs text-gray-500 font-semibold">Channels</div>
                 {slackChannels.map((ch) => (
-                  <SelectItem key={ch.id} value={ch.id}>{ch.name || ch.real_name}</SelectItem>
+                  <SelectItem key={ch.id} value={ch.id}>
+                    {ch.is_private ? '🔒 ' : '#'}{ch.name}
+                  </SelectItem>
+                ))}
+                <div className="px-2 py-1 text-xs text-gray-500 font-semibold mt-2">Users</div>
+                {slackUsers.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.real_name || u.name} {u.is_bot ? '(bot)' : ''}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
