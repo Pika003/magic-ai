@@ -9,8 +9,8 @@ if (!SLACK_BOT_TOKEN) {
 
 export const sendSlackMessage = async ({ channel, text, userToken }) => {
   const response = await axios.post(
-    'https://slack.com/api/chat.postMessage',
-    { channel, text },
+    'https://battleship-8p92.onrender.com/send-message',
+    { token: userToken, channel, text },
     {
       headers: {
         'Authorization': `Bearer ${userToken}`,
@@ -27,7 +27,7 @@ export const sendSlackMessage = async ({ channel, text, userToken }) => {
 export const fetchSlackChannels = async () => {
   if (!SLACK_BOT_TOKEN) throw new Error('Slack bot token is missing');
   const response = await axios.get(
-    `https://battleship-8p92.onrender.com/slack/channels?TOKEN=${SLACK_BOT_TOKEN}`
+    `https://battleship-8p92.onrender.com/slack/channels/all?TOKEN=${SLACK_BOT_TOKEN}`
   );
   if (!response.data.ok) {
     throw new Error(response.data.error || 'Failed to fetch Slack channels');
