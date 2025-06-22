@@ -39,8 +39,7 @@ export const fetchSlackChannels = async () => {
 export const fetchSlackAllUsers = async () => {
   if (!SLACK_USER_TOKEN) throw new Error('Slack bot token is missing');
   const response = await axios.get(
-    `http://localhost:5000/slack/channels/all?token=${SLACK_USER_TOKEN}`
-    // `https://battleship-8p92.onrender.com/slack/users?token=${SLACK_BOT_TOKEN}`
+    `https://battleship-8p92.onrender.com/slack/users?token=${SLACK_BOT_TOKEN}`
   );
   if (!response.data.ok) {
     throw new Error(response.data.error || 'Failed to fetch Slack all Users');
