@@ -15,7 +15,7 @@ export const useUsageTracking = () => {
   const { user } = useAuth();
   const [totalUsage, setTotalUsage] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [isPaidUser, setIsPaidUser] = useState(false);
+  const [isPaidUser, setIsPaidUser] = useState(true);
   const [resetDate, setResetDate] = useState<Date | null>(null);
 
   // Get user's paid status & usage reset date on mount & after payment

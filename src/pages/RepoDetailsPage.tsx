@@ -41,9 +41,8 @@ const RepoDetailsPage = () => {
       setCommitsError(null);
       try {
         const data = await viewCommits({ provider, repo });
-        // Try to normalize for both GitHub and GitLab
-        let commitsArr = Array.isArray(data) ? data : (data.commits || data.data || []);
-        setCommits(commitsArr);
+   
+        setCommits(data);
       } catch (e: any) {
         setCommitsError(e.message || "Failed to load commits");
       } finally {
@@ -178,7 +177,7 @@ const RepoDetailsPage = () => {
             <ul className="space-y-4">
               {commits.slice(0, 10).map((commit, idx) => {
                 // Normalize fields for both GitHub and GitLab
-                const sha = commit.sha || commit.id;
+                const sha =  commit?.commit?.tree?.sha || commit.sha ;
                 const message = commit.commit?.message || commit.title || commit.message;
                 const author = commit.commit?.author?.name || commit.author_name || commit.author?.login || commit.author_name || "Unknown";
                 const date = commit.commit?.author?.date || commit.created_at || commit.committed_date || commit.date;

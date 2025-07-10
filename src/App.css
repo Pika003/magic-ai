@@ -40,3 +40,24 @@
 .read-the-docs {
   color: #888;
 }
+
+.modern-calendar {
+  border-radius: 1rem;
+  box-shadow: 0 2px 8px 0 rgba(0,0,0,0.04);
+  background: #f8fafc;
+  padding: 1rem;
+}
+.react-calendar__tile--active {
+  background: #4ade80 !important;
+  color: #065f46 !important;
+  border-radius: 0.5rem !important;
+}
+.react-calendar__tile--now {
+  background: #dbeafe !important;
+  color: #1e40af !important;
+  border-radius: 0.5rem !important;
+}
+.react-calendar__tile:enabled:hover, .react-calendar__tile:enabled:focus {
+  background: #bae6fd !important;
+  color: #0369a1 !important;
+}
