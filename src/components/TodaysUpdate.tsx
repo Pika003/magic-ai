@@ -10,6 +10,7 @@ import {
   Copy,
   Send,
   Github,
+  Save,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -35,12 +36,14 @@ import {
   SelectItem,
   SelectTrigger,
   SelectContent,
+  SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import CalendarView from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import { Input } from "@/components/ui/input";
+import { getProjects } from "@/services/projectService";
 
 interface ProjectEntry {
   projectName: string;
@@ -56,6 +59,7 @@ interface DailyUpdate {
 }
 
 export const TodaysUpdate = () => {
+  const [allProjects, setAllProjects] = useState([]);
   const [inputText, setInputText] = useState("");
   const [formattedUpdate, setFormattedUpdate] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -104,6 +108,14 @@ export const TodaysUpdate = () => {
     if (tokenFromStorage) {
       setUserToken(tokenFromStorage);
       setIsSlackConnected(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      getProjects(user.id).then((projects) => {
+        setAllProjects(projects);
+      })
     }
   }, []);
 
@@ -283,7 +295,7 @@ export const TodaysUpdate = () => {
     } else {
       setInputText("");
       setFormattedUpdate("");
-      setProjects([{ projectName: "", taskCount: 0 }]);
+      await fetchDailyUpdates();
       toast({
         title: "Daily Update Saved!",
         description: "Your daily update has been saved.",
@@ -589,12 +601,32 @@ export const TodaysUpdate = () => {
                 <label className="block text-sm font-medium mb-1">Projects</label>
                 {projects.map((proj, idx) => (
                   <div key={idx} className="flex gap-2 mb-2 items-center">
-                    <Input
-                      placeholder="Project Name"
+                    <Select
                       value={proj.projectName}
-                      onChange={e => handleProjectChange(idx, 'projectName', e.target.value, 'main')}
+                      onValueChange={e => handleProjectChange(idx, 'projectName', e, 'main')}
                       className="border-slate-200 focus:border-blue-500"
-                    />
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select project" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allProjects.map(projOpt => (
+                          <SelectItem value={projOpt.name} key={projOpt.name}>
+                            {projOpt.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {/* <div className="mt-2">
+                      <label className="block text-sm font-medium mb-1">Or add new project</label>
+                      <Input
+                        placeholder="Add new project name"
+                        type="text"
+                        value={newProjectName[idx]}
+                        onChange={e => setNewProjectName(prev => prev.map((v, i) => i === idx ? e.target.value : v))}
+                        className="border-slate-200 focus:border-blue-500"
+                      />
+                    </div> */}
                     <Input
                       type="number"
                       placeholder="Tasks"
@@ -671,7 +703,7 @@ export const TodaysUpdate = () => {
                     onClick={saveUpdate}
                     className="flex-1 bg-green-500 hover:bg-green-600"
                   >
-                    <Send className="w-4 h-4 mr-2" />
+                    <Save className="w-4 h-4 mr-2" />
                     Save Update
                   </Button>
                   <Button
@@ -980,12 +1012,22 @@ export const TodaysUpdate = () => {
               <label className="block text-sm font-medium mb-1">Projects</label>
               {editProjects.map((proj, idx) => (
                 <div key={idx} className="flex gap-2 mb-2 items-center">
-                  <Input
-                    placeholder="Project Name"
+                  <Select
                     value={proj.projectName}
-                    onChange={e => handleProjectChange(idx, 'projectName', e.target.value, 'edit')}
+                    onValueChange={e => handleProjectChange(idx, 'projectName', e, 'edit')}
                     className="border-slate-200 focus:border-blue-500"
-                  />
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select project" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allProjects.map(projOpt => (
+                        <SelectItem value={projOpt.name} key={projOpt.name}>
+                          {projOpt.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Input
                     type="number"
                     placeholder="Tasks"
@@ -1066,12 +1108,22 @@ export const TodaysUpdate = () => {
               <label className="block text-sm font-medium mb-1">Projects</label>
               {addProjects.map((proj, idx) => (
                 <div key={idx} className="flex gap-2 mb-2 items-center">
-                  <Input
-                    placeholder="Project Name"
+                  <Select
                     value={proj.projectName}
-                    onChange={e => handleProjectChange(idx, 'projectName', e.target.value, 'add')}
+                    onValueChange={e => handleProjectChange(idx, 'projectName', e, 'add')}
                     className="border-slate-200 focus:border-blue-500"
-                  />
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select project" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allProjects.map(projOpt => (
+                        <SelectItem value={projOpt.name} key={projOpt.name}>
+                          {projOpt.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Input
                     type="number"
                     placeholder="Tasks"
