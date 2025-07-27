@@ -4,6 +4,27 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
+  Chart,
+  BarController,
+  BarElement,
+  CategoryScale,
+  LinearScale,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+
+Chart.register(
+  BarController,
+  BarElement,
+  CategoryScale,
+  LinearScale,
+  Title,
+  Tooltip,
+  Legend
+);
+
+import {
   Calendar,
   MessageSquare,
   RefreshCw,
@@ -49,6 +70,8 @@ import CalendarView from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import { Input } from "@/components/ui/input";
 import { getProjects } from "@/services/projectService";
+
+import openmojiFont from "./openmojiBase64";
 
 interface ProjectEntry {
   projectName: string;
@@ -149,7 +172,7 @@ export const TodaysUpdate = () => {
     const { data, error } = await (supabase as any)
       .from("daily_updates")
       .select()
-      .eq("userid", user?.id)
+      .eq("userId", user?.id)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -284,10 +307,10 @@ export const TodaysUpdate = () => {
       return;
     }
     const newUpdate = {
-      originaltext: inputText,
-      formattedupdate: formattedUpdate,
+      originalText: inputText,
+      formattedUpdate: formattedUpdate,
       created_at: new Date().toISOString(),
-      userid: user.id,
+      userId: user.id,
       projects,
     };
     const { data, error } = await (supabase as any)
@@ -396,7 +419,7 @@ export const TodaysUpdate = () => {
   // Edit update
   const openEditModal = (update: DailyUpdate) => {
     setUpdateBeingEdited(update);
-    setEditText(update.formattedupdate || update.formattedUpdate || '');
+    setEditText(update.formattedUpdate || update.formattedUpdate || '');
     setEditProjects(update.projects && update.projects.length > 0 ? update.projects : [{ projectName: "", taskCount: 0 }]);
     setEditModalOpen(true);
   };
@@ -411,7 +434,7 @@ export const TodaysUpdate = () => {
     setIsEditSaving(true);
     const { error } = await (supabase as any)
       .from("daily_updates")
-      .update({ formattedupdate: editText, projects: editProjects })
+      .update({ formattedUpdate: editText, projects: editProjects })
       .eq("id", updateBeingEdited.id);
     setIsEditSaving(false);
     if (error) {
@@ -488,10 +511,10 @@ export const TodaysUpdate = () => {
     }
     setIsAddSaving(true);
     const newUpdate = {
-      originaltext: addOriginalText,
-      formattedupdate: addFormattedUpdate,
+      originalText: addOriginalText,
+      formattedUpdate: addFormattedUpdate,
       created_at: new Date(addCreatedAt).toISOString(),
-      userid: user.id,
+      userId: user.id,
       projects: addProjects,
     };
     const { error } = await (supabase as any)
@@ -588,69 +611,257 @@ export const TodaysUpdate = () => {
       return updateDate >= start && updateDate <= end;
     });
   };
+  
+  const cleanText = (text: string) => text.replace(/\p{Extended_Pictographic}/gu, '');
+
+  const ChartJSBarChart = async (
+    doc: jsPDF,
+    data: any,
+    yPosition: number
+  ) => {
+    return new Promise<void>((resolve) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1600; // High resolution canvas
+      canvas.height = 800;
+      const ctx = canvas.getContext('2d');
+
+      const chart = new Chart(ctx!, {
+        type: 'bar',
+        data,
+        options: {
+          responsive: false,
+          animation: false,
+          plugins: {
+            title: {
+              display: true,
+              text: '📊 Project Tasks Chart',
+              font: {
+                size: 36, 
+                weight: 'bold',
+                family: 'Arial',
+              },
+              padding: {
+                top: 20,
+                bottom: 40,
+              },
+              color: '#2c3e50',
+            },
+            legend: {
+              position: 'bottom',
+              labels: {
+                font: {
+                  size: 18, 
+                  weight: 'bold',
+                  family: 'Arial',
+                },
+                color: '#2c3e50',
+                padding: 20,
+                boxWidth: 22,
+              },
+            },
+          },
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: 'Date',
+                font: {
+                  size: 18
+                }
+              },
+              ticks: {
+                maxRotation: 0,
+                minRotation: 0,
+                autoSkip: true,
+                font: {
+                  size: 14
+                }
+              }
+            },
+            y: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: 'Tasks',
+                font: {
+                  size: 18
+                }
+              },
+              ticks: {
+                font: {
+                  size: 14
+                }
+              }
+            },
+          }
+        },
+        plugins: [{
+          id: 'done',
+          afterRender: () => {
+            setTimeout(() => {
+              const chartImage = canvas.toDataURL('image/png', 1.0);
+              const pageWidth = doc.internal.pageSize.getWidth();
+              const chartWidth = 180;
+              const chartX = (pageWidth - chartWidth) / 2; // Center it
+
+              doc.addImage(chartImage, 'PNG', chartX, yPosition, chartWidth, 90);
+
+              chart.destroy();
+              resolve();
+            }, 500);
+          }
+        }]
+      });
+    });
+  };
+
+
 
   const exportToPDF = async () => {
     setIsExporting(true);
     try {
       const doc = new jsPDF();
+
+      // Register the font with jsPDF
+      doc.addFileToVFS("OpenMoji.ttf", openmojiFont);
+      doc.addFont("OpenMoji.ttf", "OpenMoji", "normal");
+      doc.setFont("OpenMoji");
+
       const filteredUpdates = getFilteredUpdates();
       const { start, end } = getDateRange();
-      
-      // Title
+
       doc.setFontSize(20);
-      doc.text('Daily Updates Report', 20, 30);
-      
-      // Date range
+      doc.setTextColor(40, 40, 80);
+      doc.setFont("helvetica", "bold");
+      doc.text("📋 Daily Updates Report", 20, 30);
+
       doc.setFontSize(12);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont("helvetica", "normal");
       doc.text(`Period: ${start.toLocaleDateString()} - ${end.toLocaleDateString()}`, 20, 45);
       doc.text(`Total Updates: ${filteredUpdates.length}`, 20, 55);
-      
+
       let yPosition = 70;
-      
+
       filteredUpdates.forEach((update, index) => {
         if (yPosition > 250) {
           doc.addPage();
           yPosition = 30;
         }
-        
+
         doc.setFontSize(14);
+        doc.setTextColor(40, 40, 80);
+        doc.setFont("helvetica", "bold");
         doc.text(`Update ${index + 1} - ${new Date(update.created_at).toLocaleDateString()}`, 20, yPosition);
         yPosition += 10;
-        
+
         doc.setFontSize(10);
-        const lines = doc.splitTextToSize(update.formattedupdate || update.formattedUpdate || update.originaltext || update.originalText || '', 170);
+        doc.setTextColor(33, 37, 41);
+        doc.setFont("helvetica", "normal");
+
+        const lines = doc.splitTextToSize(
+          update.formattedUpdate
+            ? cleanText(update.formattedUpdate.replace(/[\u0000-\u001F]/g, ''))
+            : update.originalText
+            ? cleanText(update.originalText.replace(/[\u0000-\u001F]/g, ''))
+            : '',
+          170
+        );
         doc.text(lines, 20, yPosition);
         yPosition += lines.length * 5;
-        
+
         if (update.projects && update.projects.length > 0) {
           yPosition += 5;
-          doc.text('Projects:', 20, yPosition);
+          doc.setDrawColor(200);
+          doc.line(20, yPosition, 190, yPosition);
           yPosition += 5;
+
+          doc.setTextColor(34, 139, 34);
+          doc.setFont("helvetica", "bold");
+          doc.text(`📌 Projects:`, 20, yPosition);
+          yPosition += 5;
+
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(33, 37, 41);
           update.projects.forEach(project => {
-            doc.text(`• ${project.projectName}: ${project.taskCount} tasks`, 25, yPosition);
+            doc.text(`• ${cleanText(project.projectName)}: ${project.taskCount} tasks`, 25, yPosition);
             yPosition += 5;
           });
         }
-        
+
         yPosition += 10;
       });
-      
-      doc.save(`daily-updates-${start.toISOString().slice(0, 10)}-to-${end.toISOString().slice(0, 10)}.pdf`);
-      
-      toast({
-        title: "Export Complete",
-        description: "PDF file has been downloaded successfully.",
-      });
-    } catch (error) {
+
+      // Chart data
+      const projectsPerDay = filteredUpdates.reduce((acc, update) => {
+        const date = new Date(update.created_at).toLocaleDateString();
+        acc[date] = acc[date] || {};
+        update.projects?.forEach(project => {
+          const name = cleanText(project.projectName);
+          acc[date][name] = (acc[date][name] || 0) + project.taskCount;
+        });
+        return acc;
+      }, {} as Record<string, Record<string, number>>);
+
+      const projectNames = [...new Set(
+        Object.values(projectsPerDay).flatMap(day => Object.keys(day))
+      )];
+
+      const colorPalette = [
+        '#e6194b', '#3cb44b', '#ffe119', '#4363d8',
+        '#f58231', '#911eb4', '#46f0f0', '#f032e6',
+        '#bcf60c', '#fabebe', '#008080', '#e6beff',
+        '#9a6324', '#fffac8', '#800000', '#aaffc3',
+        '#808000', '#ffd8b1', '#000075', '#808080'
+      ];
+
+      const chartData = {
+        labels: Object.keys(projectsPerDay),
+        datasets: projectNames.map((projectName, i) => ({
+          label: projectName,
+          data: Object.keys(projectsPerDay).map(date => projectsPerDay[date][projectName] || 0),
+          backgroundColor: colorPalette[i % colorPalette.length],
+          borderColor: colorPalette[i % colorPalette.length],
+          borderWidth: 1,
+        })),
+      };
+
+      // Add chart section
+      if (yPosition > 180) {
+        doc.addPage();
+        yPosition = 30;
+      }
+
+      doc.setFontSize(14);
+      doc.setTextColor(40, 40, 80);
+      doc.setFont("helvetica", "bold");
+      doc.text("📊 Project Tasks Chart", 20, yPosition);
+      yPosition += 10;
+
+      await ChartJSBarChart(doc, chartData, yPosition);
+
+      // Final save
+      setTimeout(() => {
+        doc.save(`daily-updates-${start.toISOString().slice(0, 10)}-to-${end.toISOString().slice(0, 10)}.pdf`);
+
+        toast({
+          title: "Export Complete",
+          description: "PDF file has been downloaded successfully.",
+        });
+      }, 300);
+    } catch (error: any) {
+      console.error(error);
       toast({
         title: "Export Failed",
-        description: "Failed to export PDF. Please try again.",
+        description: `Failed to export PDF. Error: ${error.message}`,
         variant: "destructive",
       });
     } finally {
       setIsExporting(false);
     }
   };
+
+
 
   const exportToCSV = async () => {
     setIsExporting(true);
@@ -661,8 +872,12 @@ export const TodaysUpdate = () => {
       const csvData = filteredUpdates.map(update => ({
         date: new Date(update.created_at).toLocaleDateString(),
         time: new Date(update.created_at).toLocaleTimeString(),
-        original_text: update.originaltext || update.originalText || '',
-        formatted_update: update.formattedupdate || update.formattedUpdate || '',
+        original_text: update.originalText || update.originalText || '',
+        formatted_update: update.formattedUpdate || update.formattedUpdate || ''
+          .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // remove non-printable characters
+          .replace(/[^\x00-\x7F]/g, '') // remove non-ASCII characters
+          .replace(/\p{Extended_Pictographic}/gu, '') // remove emojis
+          .replace(/(^\s+|\s+$)/g, ''), // remove leading and trailing whitespace
         projects: update.projects?.map(p => `${p.projectName}:${p.taskCount}`).join('; ') || '',
         total_tasks: update.projects?.reduce((sum, p) => sum + p.taskCount, 0) || 0
       }));
@@ -1028,7 +1243,7 @@ export const TodaysUpdate = () => {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => copyToClipboard(update.formattedupdate || update.formattedUpdate || '')}
+                                  onClick={() => copyToClipboard(update.formattedUpdate || update.formattedUpdate || '')}
                                 >
                                   <Copy className="w-4 h-4" />
                                 </Button>
@@ -1049,7 +1264,7 @@ export const TodaysUpdate = () => {
                               </div>
                             </div>
                             <div className="text-green-800 text-sm whitespace-pre-wrap">
-                              {update.formattedupdate || update.originaltext}
+                              {update.formattedUpdate || update.originalText}
                               {update.projects && update.projects.length > 0 && (
                                 <ul className="mt-2 ml-4 list-disc text-green-700">
                                   {update.projects.map((proj, idx) => (
