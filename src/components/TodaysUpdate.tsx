@@ -11,7 +11,12 @@ import {
   Send,
   Github,
   Save,
+  Download,
+  FileText,
+  BarChart3,
 } from "lucide-react";
+import jsPDF from 'jspdf';
+import Papa from 'papaparse';
 import { toast } from "@/hooks/use-toast";
 import {
   formatDailyUpdateWithAI,
@@ -51,10 +56,13 @@ interface ProjectEntry {
 }
 interface DailyUpdate {
   id: string;
-  originalText: string;
-  formattedUpdate: string;
+  originaltext?: string;
+  originalText?: string;
+  formattedupdate?: string;
+  formattedUpdate?: string;
   created_at: string;
-  userId: string;
+  userid?: string;
+  userId?: string;
   projects: ProjectEntry[];
 }
 
@@ -138,16 +146,16 @@ export const TodaysUpdate = () => {
   }, {} as Record<string, DailyUpdate[]>);
 
   const fetchDailyUpdates = async () => {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from("daily_updates")
       .select()
-      .eq("userId", user?.id)
+      .eq("userid", user?.id)
       .order("created_at", { ascending: false });
 
     if (error) {
       console.error("Failed to fetch daily updates", error);
     } else {
-      setDailyUpdates(data || []);
+      setDailyUpdates((data || []) as DailyUpdate[]);
     }
   };
 
@@ -275,15 +283,14 @@ export const TodaysUpdate = () => {
       });
       return;
     }
-    const newUpdate: DailyUpdate = {
-      id: Date.now().toString(),
-      originalText: inputText,
-      formattedUpdate: formattedUpdate,
+    const newUpdate = {
+      originaltext: inputText,
+      formattedupdate: formattedUpdate,
       created_at: new Date().toISOString(),
-      userId: user.id,
+      userid: user.id,
       projects,
     };
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from("daily_updates")
       .insert(newUpdate);
     if (error) {
@@ -389,7 +396,7 @@ export const TodaysUpdate = () => {
   // Edit update
   const openEditModal = (update: DailyUpdate) => {
     setUpdateBeingEdited(update);
-    setEditText(update.formattedUpdate);
+    setEditText(update.formattedupdate || update.formattedUpdate || '');
     setEditProjects(update.projects && update.projects.length > 0 ? update.projects : [{ projectName: "", taskCount: 0 }]);
     setEditModalOpen(true);
   };
@@ -402,9 +409,9 @@ export const TodaysUpdate = () => {
   const handleEditSave = async () => {
     if (!updateBeingEdited) return;
     setIsEditSaving(true);
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from("daily_updates")
-      .update({ formattedUpdate: editText, projects: editProjects })
+      .update({ formattedupdate: editText, projects: editProjects })
       .eq("id", updateBeingEdited.id);
     setIsEditSaving(false);
     if (error) {
@@ -435,7 +442,7 @@ export const TodaysUpdate = () => {
   const handleDelete = async () => {
     if (!updateBeingDeleted) return;
     setIsDeleteProcessing(true);
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from("daily_updates")
       .delete()
       .eq("id", updateBeingDeleted.id);
@@ -481,14 +488,13 @@ export const TodaysUpdate = () => {
     }
     setIsAddSaving(true);
     const newUpdate = {
-      id: Date.now().toString(),
-      originalText: addOriginalText,
-      formattedUpdate: addFormattedUpdate,
+      originaltext: addOriginalText,
+      formattedupdate: addFormattedUpdate,
       created_at: new Date(addCreatedAt).toISOString(),
-      userId: user.id,
+      userid: user.id,
       projects: addProjects,
     };
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from("daily_updates")
       .insert(newUpdate);
     setIsAddSaving(false);
@@ -543,6 +549,154 @@ export const TodaysUpdate = () => {
     });
   });
   const projectSummaryList = Object.values(projectTaskSummary);
+
+  // Export functionality
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'pdf' | 'csv'>('pdf');
+  const [exportRange, setExportRange] = useState<'7days' | '1month' | 'custom'>('7days');
+  const [customStartDate, setCustomStartDate] = useState(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+  const [customEndDate, setCustomEndDate] = useState(new Date().toISOString().slice(0, 10));
+  const [isExporting, setIsExporting] = useState(false);
+
+  const getDateRange = () => {
+    const now = new Date();
+    const end = new Date(now);
+    let start: Date;
+
+    switch (exportRange) {
+      case '7days':
+        start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case '1month':
+        start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case 'custom':
+        start = new Date(customStartDate);
+        end.setTime(new Date(customEndDate).getTime());
+        break;
+      default:
+        start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    }
+
+    return { start, end };
+  };
+
+  const getFilteredUpdates = () => {
+    const { start, end } = getDateRange();
+    return dailyUpdates.filter(update => {
+      const updateDate = new Date(update.created_at);
+      return updateDate >= start && updateDate <= end;
+    });
+  };
+
+  const exportToPDF = async () => {
+    setIsExporting(true);
+    try {
+      const doc = new jsPDF();
+      const filteredUpdates = getFilteredUpdates();
+      const { start, end } = getDateRange();
+      
+      // Title
+      doc.setFontSize(20);
+      doc.text('Daily Updates Report', 20, 30);
+      
+      // Date range
+      doc.setFontSize(12);
+      doc.text(`Period: ${start.toLocaleDateString()} - ${end.toLocaleDateString()}`, 20, 45);
+      doc.text(`Total Updates: ${filteredUpdates.length}`, 20, 55);
+      
+      let yPosition = 70;
+      
+      filteredUpdates.forEach((update, index) => {
+        if (yPosition > 250) {
+          doc.addPage();
+          yPosition = 30;
+        }
+        
+        doc.setFontSize(14);
+        doc.text(`Update ${index + 1} - ${new Date(update.created_at).toLocaleDateString()}`, 20, yPosition);
+        yPosition += 10;
+        
+        doc.setFontSize(10);
+        const lines = doc.splitTextToSize(update.formattedupdate || update.formattedUpdate || update.originaltext || update.originalText || '', 170);
+        doc.text(lines, 20, yPosition);
+        yPosition += lines.length * 5;
+        
+        if (update.projects && update.projects.length > 0) {
+          yPosition += 5;
+          doc.text('Projects:', 20, yPosition);
+          yPosition += 5;
+          update.projects.forEach(project => {
+            doc.text(`• ${project.projectName}: ${project.taskCount} tasks`, 25, yPosition);
+            yPosition += 5;
+          });
+        }
+        
+        yPosition += 10;
+      });
+      
+      doc.save(`daily-updates-${start.toISOString().slice(0, 10)}-to-${end.toISOString().slice(0, 10)}.pdf`);
+      
+      toast({
+        title: "Export Complete",
+        description: "PDF file has been downloaded successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "Failed to export PDF. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const exportToCSV = async () => {
+    setIsExporting(true);
+    try {
+      const filteredUpdates = getFilteredUpdates();
+      const { start, end } = getDateRange();
+      
+      const csvData = filteredUpdates.map(update => ({
+        date: new Date(update.created_at).toLocaleDateString(),
+        time: new Date(update.created_at).toLocaleTimeString(),
+        original_text: update.originaltext || update.originalText || '',
+        formatted_update: update.formattedupdate || update.formattedUpdate || '',
+        projects: update.projects?.map(p => `${p.projectName}:${p.taskCount}`).join('; ') || '',
+        total_tasks: update.projects?.reduce((sum, p) => sum + p.taskCount, 0) || 0
+      }));
+      
+      const csv = Papa.unparse(csvData);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `daily-updates-${start.toISOString().slice(0, 10)}-to-${end.toISOString().slice(0, 10)}.csv`;
+      link.click();
+      
+      toast({
+        title: "Export Complete",
+        description: "CSV file has been downloaded successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "Failed to export CSV. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExport = () => {
+    if (exportFormat === 'pdf') {
+      exportToPDF();
+    } else {
+      exportToCSV();
+    }
+    setExportModalOpen(false);
+  };
 
   return (
     <div className="w-full px-2 md:px-4 pt-10">
@@ -604,7 +758,6 @@ export const TodaysUpdate = () => {
                     <Select
                       value={proj.projectName}
                       onValueChange={e => handleProjectChange(idx, 'projectName', e, 'main')}
-                      className="border-slate-200 focus:border-blue-500"
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select project" />
@@ -801,13 +954,24 @@ export const TodaysUpdate = () => {
                 <span>Daily Update Calendar</span>
               </div>
               
-              <Button
-                size="sm"
-                className="ml-2 bg-blue-500 hover:bg-blue-600 text-white"
-                onClick={openAddModal}
-              >
-                + Add
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setExportModalOpen(true)}
+                  className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Export
+                </Button>
+                <Button
+                  size="sm"
+                  className="ml-2 bg-blue-500 hover:bg-blue-600 text-white"
+                  onClick={openAddModal}
+                >
+                  + Add
+                </Button>
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -864,7 +1028,7 @@ export const TodaysUpdate = () => {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => copyToClipboard(update.formattedUpdate)}
+                                  onClick={() => copyToClipboard(update.formattedupdate || update.formattedUpdate || '')}
                                 >
                                   <Copy className="w-4 h-4" />
                                 </Button>
@@ -885,7 +1049,7 @@ export const TodaysUpdate = () => {
                               </div>
                             </div>
                             <div className="text-green-800 text-sm whitespace-pre-wrap">
-                              {update.formattedUpdate}
+                              {update.formattedupdate || update.originaltext}
                               {update.projects && update.projects.length > 0 && (
                                 <ul className="mt-2 ml-4 list-disc text-green-700">
                                   {update.projects.map((proj, idx) => (
@@ -1015,7 +1179,6 @@ export const TodaysUpdate = () => {
                   <Select
                     value={proj.projectName}
                     onValueChange={e => handleProjectChange(idx, 'projectName', e, 'edit')}
-                    className="border-slate-200 focus:border-blue-500"
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select project" />
@@ -1111,7 +1274,6 @@ export const TodaysUpdate = () => {
                   <Select
                     value={proj.projectName}
                     onValueChange={e => handleProjectChange(idx, 'projectName', e, 'add')}
-                    className="border-slate-200 focus:border-blue-500"
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select project" />
@@ -1157,6 +1319,111 @@ export const TodaysUpdate = () => {
               {isAddSaving ? "Saving..." : "Add"}
             </Button>
             <Button variant="outline" onClick={closeAddModal}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Export Modal */}
+      <Dialog open={exportModalOpen} onOpenChange={setExportModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Download className="w-5 h-5" />
+              Export Daily Updates
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Export Format</label>
+              <Select value={exportFormat} onValueChange={(value: 'pdf' | 'csv') => setExportFormat(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pdf">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      PDF Document
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="csv">
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="w-4 h-4" />
+                      CSV Spreadsheet
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-2">Date Range</label>
+              <Select value={exportRange} onValueChange={(value: '7days' | '1month' | 'custom') => setExportRange(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7days">Last 7 Days</SelectItem>
+                  <SelectItem value="1month">Last 30 Days</SelectItem>
+                  <SelectItem value="custom">Custom Range</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {exportRange === 'custom' && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Start Date</label>
+                  <Input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">End Date</label>
+                  <Input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="text-sm text-gray-600">
+                <strong>Preview:</strong> {getFilteredUpdates().length} updates will be exported
+                {exportRange === 'custom' && (
+                  <div className="mt-1">
+                    From {new Date(customStartDate).toLocaleDateString()} to {new Date(customEndDate).toLocaleDateString()}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button
+              onClick={handleExport}
+              disabled={isExporting || getFilteredUpdates().length === 0}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {isExporting ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4 mr-2" />
+                  Export {exportFormat.toUpperCase()}
+                </>
+              )}
+            </Button>
+            <Button variant="outline" onClick={() => setExportModalOpen(false)}>
               Cancel
             </Button>
           </DialogFooter>
