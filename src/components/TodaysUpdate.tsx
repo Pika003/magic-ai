@@ -9,20 +9,27 @@ import {
   BarElement,
   CategoryScale,
   LinearScale,
+  LineController,
+  LineElement,
+  PointElement,
   Title,
   Tooltip,
   Legend,
-} from 'chart.js';
+} from 'chart.js/auto';
 
 Chart.register(
   BarController,
   BarElement,
   CategoryScale,
   LinearScale,
+  LineController,
+  LineElement,
+  PointElement,
   Title,
   Tooltip,
   Legend
 );
+
 
 import {
   Calendar,
@@ -612,129 +619,338 @@ export const TodaysUpdate = () => {
     });
   };
   
-  const cleanText = (text: string) => text.replace(/\p{Extended_Pictographic}/gu, '');
-
-  const ChartJSBarChart = async (
-    doc: jsPDF,
-    data: any,
-    yPosition: number
-  ) => {
-    return new Promise<void>((resolve) => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 1600; // High resolution canvas
-      canvas.height = 800;
-      const ctx = canvas.getContext('2d');
-
-      const chart = new Chart(ctx!, {
-        type: 'bar',
-        data,
-        options: {
-          responsive: false,
-          animation: false,
-          plugins: {
-            title: {
-              display: true,
-              text: '📊 Project Tasks Chart',
-              font: {
-                size: 36, 
-                weight: 'bold',
-                family: 'Arial',
-              },
-              padding: {
-                top: 20,
-                bottom: 40,
-              },
-              color: '#2c3e50',
-            },
-            legend: {
-              position: 'bottom',
-              labels: {
-                font: {
-                  size: 18, 
-                  weight: 'bold',
-                  family: 'Arial',
-                },
-                color: '#2c3e50',
-                padding: 20,
-                boxWidth: 22,
-              },
-            },
-          },
-          scales: {
-            x: {
-              title: {
-                display: true,
-                text: 'Date',
-                font: {
-                  size: 18
-                }
-              },
-              ticks: {
-                maxRotation: 0,
-                minRotation: 0,
-                autoSkip: true,
-                font: {
-                  size: 14
-                }
-              }
-            },
-            y: {
-              beginAtZero: true,
-              title: {
-                display: true,
-                text: 'Tasks',
-                font: {
-                  size: 18
-                }
-              },
-              ticks: {
-                font: {
-                  size: 14
-                }
-              }
-            },
-          }
-        },
-        plugins: [{
-          id: 'done',
-          afterRender: () => {
-            setTimeout(() => {
-              const chartImage = canvas.toDataURL('image/png', 1.0);
-              const pageWidth = doc.internal.pageSize.getWidth();
-              const chartWidth = 180;
-              const chartX = (pageWidth - chartWidth) / 2; // Center it
-
-              doc.addImage(chartImage, 'PNG', chartX, yPosition, chartWidth, 90);
-
-              chart.destroy();
-              resolve();
-            }, 500);
-          }
-        }]
-      });
-    });
-  };
-
-
 
   const exportToPDF = async () => {
     setIsExporting(true);
     try {
       const doc = new jsPDF();
 
-      // Register the font with jsPDF
-      doc.addFileToVFS("OpenMoji.ttf", openmojiFont);
-      doc.addFont("OpenMoji.ttf", "OpenMoji", "normal");
-      doc.setFont("OpenMoji");
-
       const filteredUpdates = getFilteredUpdates();
       const { start, end } = getDateRange();
 
+      // Helper function to clean text - remove emojis and control characters
+      const cleanText = (text) => {
+        if (!text) return '';
+        return text
+          // Remove emojis and special Unicode characters
+          .replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '')
+          // Remove other emoji ranges
+          .replace(/[\u{1F900}-\u{1F9FF}]|[\u{1FA70}-\u{1FAFF}]/gu, '')
+          // Remove control characters except newlines and carriage returns
+          .replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F\u007F-\u009F]/g, '')
+          // Remove problematic symbols like ‰ (per mille) and similar
+          .replace(/[‰‱%æ]/g, '')
+          // Normalize line breaks to \n
+          .replace(/\r\n/g, '\n')
+          .replace(/\r/g, '\n')
+          // Clean up multiple spaces but preserve single spaces
+          .replace(/[ \t]+/g, ' ')
+          // Clean up multiple newlines but preserve paragraph breaks
+          .replace(/\n{3,}/g, '\n\n')
+          // Trim whitespace from each line but preserve the line structure
+          .split('\n')
+          .map(line => line.trim())
+          .join('\n')
+          .trim();
+      };
+
+      // Enhanced ChartJSBarChart function
+      const ChartJSBarChart = async (doc, data, yPosition) => {
+        return new Promise((resolve) => {
+          const canvas = document.createElement('canvas');
+          canvas.width = 1600;
+          canvas.height = 800;
+          const ctx = canvas.getContext('2d');
+
+          // Sort the data by date to ensure proper order
+          const sortedLabels = [...data.labels].sort((a, b) => new Date(a) - new Date(b));
+          
+          // Reorder the datasets data according to sorted labels
+          const sortedDatasets = data.datasets.map(dataset => ({
+            ...dataset,
+            data: sortedLabels.map(label => {
+              const originalIndex = data.labels.indexOf(label);
+              return dataset.data[originalIndex] || 0;
+            })
+          }));
+
+          const sortedData = {
+            labels: sortedLabels,
+            datasets: sortedDatasets
+          };
+
+          const chart = new Chart(ctx, {
+            type: 'bar',
+            data: sortedData,
+            options: {
+              responsive: false,
+              animation: false,
+              categoryPercentage: 0.8, // Reduce gap between date groups
+              barPercentage: 0.9, // Reduce gap between bars in same group
+              plugins: {
+                title: {
+                  display: true,
+                  text: 'Project Tasks Chart',
+                  font: {
+                    size: 36,
+                    weight: 'bold',
+                    family: 'Arial',
+                  },
+                  padding: {
+                    top: 20,
+                    bottom: 40,
+                  },
+                  color: '#2c3e50',
+                },
+                legend: {
+                  position: 'bottom',
+                  labels: {
+                    font: {
+                      size: 16,
+                      weight: 'normal',
+                      family: 'Arial',
+                    },
+                    color: '#2c3e50',
+                    padding: 15,
+                    boxWidth: 20,
+                    // Filter out empty datasets from legend
+                    filter: function(legendItem, chartData) {
+                      const dataset = chartData.datasets[legendItem.datasetIndex];
+                      return dataset.data.some(value => value > 0);
+                    }
+                  },
+                },
+              },
+              scales: {
+                x: {
+                  title: {
+                    display: true,
+                    text: 'Date',
+                    font: {
+                      size: 18,
+                      weight: 'bold'
+                    },
+                    color: '#2c3e50'
+                  },
+                  ticks: {
+                    maxRotation: 45,
+                    minRotation: 0,
+                    autoSkip: false, // Show all dates
+                    font: {
+                      size: 14
+                    },
+                    color: '#2c3e50'
+                  },
+                  grid: {
+                    display: false
+                  }
+                },
+                y: {
+                  beginAtZero: true,
+                  title: {
+                    display: true,
+                    text: 'Number of Tasks',
+                    font: {
+                      size: 18,
+                      weight: 'bold'
+                    },
+                    color: '#2c3e50'
+                  },
+                  ticks: {
+                    stepSize: 1,
+                    font: {
+                      size: 14
+                    },
+                    color: '#2c3e50'
+                  },
+                  grid: {
+                    color: '#e0e0e0'
+                  }
+                },
+              },
+              elements: {
+                bar: {
+                  borderWidth: 1,
+                  borderSkipped: false
+                }
+              }
+            },
+            plugins: [{
+              id: 'done',
+              afterRender: () => {
+                setTimeout(() => {
+                  const chartImage = canvas.toDataURL('image/png', 1.0);
+                  const pageWidth = doc.internal.pageSize.getWidth();
+                  const chartWidth = 170;
+                  const chartHeight = 85;
+                  const chartX = (pageWidth - chartWidth) / 2;
+
+                  doc.addImage(chartImage, 'PNG', chartX, yPosition, chartWidth, chartHeight);
+
+                  chart.destroy();
+                  canvas.remove();
+                  resolve();
+                }, 500);
+              }
+            }]
+          });
+        });
+      };
+
+      // Line chart function for individual project progress
+      const ChartJSLineChart = async (doc, data, yPosition) => {
+        return new Promise((resolve) => {
+          const canvas = document.createElement('canvas');
+          canvas.width = 1600;
+          canvas.height = 800;
+          const ctx = canvas.getContext('2d');
+
+          // Sort the data by date to ensure proper order
+          const sortedLabels = [...data.labels].sort((a, b) => new Date(a) - new Date(b));
+          
+          // Reorder the datasets data according to sorted labels
+          const sortedDatasets = data.datasets.map(dataset => ({
+            ...dataset,
+            data: sortedLabels.map(label => {
+              const originalIndex = data.labels.indexOf(label);
+              return dataset.data[originalIndex] || 0;
+            }),
+            fill: false,
+            borderWidth: 3,
+            pointRadius: 5,
+            pointHoverRadius: 7,
+            tension: 0.2 // Smooth curves
+          }));
+
+          const sortedData = {
+            labels: sortedLabels,
+            datasets: sortedDatasets
+          };
+
+          const chart = new Chart(ctx, {
+            type: 'line',
+            data: sortedData,
+            options: {
+              responsive: false,
+              animation: false,
+              plugins: {
+                title: {
+                  display: true,
+                  text: 'Individual Project Progress Over Time',
+                  font: {
+                    size: 36,
+                    weight: 'bold',
+                    family: 'Arial',
+                  },
+                  padding: {
+                    top: 20,
+                    bottom: 40,
+                  },
+                  color: '#2c3e50',
+                },
+                legend: {
+                  position: 'bottom',
+                  labels: {
+                    font: {
+                      size: 16,
+                      weight: 'normal',
+                      family: 'Arial',
+                    },
+                    color: '#2c3e50',
+                    padding: 15,
+                    boxWidth: 20,
+                    usePointStyle: true,
+                    // Filter out empty datasets from legend
+                    filter: function(legendItem, chartData) {
+                      const dataset = chartData.datasets[legendItem.datasetIndex];
+                      return dataset.data.some(value => value > 0);
+                    }
+                  },
+                },
+              },
+              scales: {
+                x: {
+                  title: {
+                    display: true,
+                    text: 'Date',
+                    font: {
+                      size: 18,
+                      weight: 'bold'
+                    },
+                    color: '#2c3e50'
+                  },
+                  ticks: {
+                    maxRotation: 45,
+                    minRotation: 0,
+                    autoSkip: false,
+                    font: {
+                      size: 14
+                    },
+                    color: '#2c3e50'
+                  },
+                  grid: {
+                    color: '#f0f0f0'
+                  }
+                },
+                y: {
+                  beginAtZero: true,
+                  title: {
+                    display: true,
+                    text: 'Number of Tasks',
+                    font: {
+                      size: 18,
+                      weight: 'bold'
+                    },
+                    color: '#2c3e50'
+                  },
+                  ticks: {
+                    stepSize: 1,
+                    font: {
+                      size: 14
+                    },
+                    color: '#2c3e50'
+                  },
+                  grid: {
+                    color: '#f0f0f0'
+                  }
+                },
+              },
+              elements: {
+                point: {
+                  backgroundColor: '#fff',
+                  borderWidth: 2
+                }
+              }
+            },
+            plugins: [{
+              id: 'done',
+              afterRender: () => {
+                setTimeout(() => {
+                  const chartImage = canvas.toDataURL('image/png', 1.0);
+                  const pageWidth = doc.internal.pageSize.getWidth();
+                  const chartWidth = 170;
+                  const chartHeight = 85;
+                  const chartX = (pageWidth - chartWidth) / 2;
+
+                  doc.addImage(chartImage, 'PNG', chartX, yPosition, chartWidth, chartHeight);
+
+                  chart.destroy();
+                  canvas.remove();
+                  resolve();
+                }, 500);
+              }
+            }]
+          });
+        });
+      };
+
+      // PDF Title
       doc.setFontSize(20);
       doc.setTextColor(40, 40, 80);
       doc.setFont("helvetica", "bold");
-      doc.text("📋 Daily Updates Report", 20, 30);
+      doc.text("Daily Updates Report", 20, 30);
 
+      // Report metadata
       doc.setFontSize(12);
       doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "normal");
@@ -742,9 +958,48 @@ export const TodaysUpdate = () => {
       doc.text(`Total Updates: ${filteredUpdates.length}`, 20, 55);
 
       let yPosition = 70;
+      const pageHeight = doc.internal.pageSize.height;
+      const margin = 20;
+      const rightMargin = 20;
+      const maxWidth = doc.internal.pageSize.width - margin - rightMargin; // Fixed width calculation
 
-      filteredUpdates.forEach((update, index) => {
-        if (yPosition > 250) {
+      // Chart section
+      const projectsPerDay = filteredUpdates.reduce((acc, update) => {
+        const date = new Date(update.created_at).toLocaleDateString();
+        acc[date] = acc[date] || {};
+        update.projects?.forEach(project => {
+          const name = cleanText(project.projectName) || 'Unnamed Project';
+          acc[date][name] = (acc[date][name] || 0) + (project.taskCount || 0);
+        });
+        return acc;
+      }, {});
+
+      const projectNames = [...new Set(
+        Object.values(projectsPerDay).flatMap(day => Object.keys(day))
+      )];
+
+      if (projectNames.length > 0) {
+        const colorPalette = [
+          '#e6194b', '#3cb44b', '#ffe119', '#4363d8',
+          '#f58231', '#911eb4', '#46f0f0', '#f032e6',
+          '#bcf60c', '#fabebe', '#008080', '#e6beff',
+          '#9a6324', '#fffac8', '#800000', '#aaffc3',
+          '#808000', '#ffd8b1', '#000075', '#808080'
+        ];
+
+        const chartData = {
+          labels: Object.keys(projectsPerDay),
+          datasets: projectNames.map((projectName, i) => ({
+            label: projectName,
+            data: Object.keys(projectsPerDay).map(date => projectsPerDay[date][projectName] || 0),
+            backgroundColor: colorPalette[i % colorPalette.length],
+            borderColor: colorPalette[i % colorPalette.length],
+            borderWidth: 1,
+          })),
+        };
+
+        // Add bar chart
+        if (yPosition > pageHeight - 100) {
           doc.addPage();
           yPosition = 30;
         }
@@ -752,105 +1007,154 @@ export const TodaysUpdate = () => {
         doc.setFontSize(14);
         doc.setTextColor(40, 40, 80);
         doc.setFont("helvetica", "bold");
-        doc.text(`Update ${index + 1} - ${new Date(update.created_at).toLocaleDateString()}`, 20, yPosition);
-        yPosition += 10;
+        doc.text("Project Tasks Chart", margin, yPosition);
+        yPosition += 20;
 
+        // Use the embedded ChartJSBarChart function
+        await ChartJSBarChart(doc, chartData, yPosition);
+        yPosition += 100; // Space after bar chart
+
+        // Add line chart for individual project progress
+        if (yPosition > pageHeight - 100) {
+          doc.addPage();
+          yPosition = 30;
+        }
+
+        doc.setFontSize(14);
+        doc.setTextColor(40, 40, 80);
+        doc.setFont("helvetica", "bold");
+        doc.text("Project Progress Over Time", margin, yPosition);
+        yPosition += 20;
+
+        // Use the embedded ChartJSLineChart function
+        await ChartJSLineChart(doc, chartData, yPosition);
+      }
+
+      yPosition += 150;
+
+      //Daily Updates
+      filteredUpdates.forEach((update, index) => {
+        // Check if we need a new page
+        if (yPosition > pageHeight - 60) {
+          doc.addPage();
+          yPosition = 30;
+        }
+
+        // Update header
+        doc.setFontSize(14);
+        doc.setTextColor(40, 40, 80);
+        doc.setFont("helvetica", "bold");
+        doc.text(`Update ${index + 1} - ${new Date(update.created_at).toLocaleDateString()}`, margin, yPosition);
+        yPosition += 15;
+
+        // Update content
         doc.setFontSize(10);
         doc.setTextColor(33, 37, 41);
         doc.setFont("helvetica", "normal");
 
-        const lines = doc.splitTextToSize(
-          update.formattedUpdate
-            ? cleanText(update.formattedUpdate.replace(/[\u0000-\u001F]/g, ''))
-            : update.originalText
-            ? cleanText(update.originalText.replace(/[\u0000-\u001F]/g, ''))
-            : '',
-          170
-        );
-        doc.text(lines, 20, yPosition);
-        yPosition += lines.length * 5;
+        // Get the update text and clean it
+        let updateText = '';
+        if (update.formattedUpdate) {
+          updateText = cleanText(update.formattedUpdate);
+        } else if (update.originalText) {
+          updateText = cleanText(update.originalText);
+        }
 
-        if (update.projects && update.projects.length > 0) {
-          yPosition += 5;
-          doc.setDrawColor(200);
-          doc.line(20, yPosition, 190, yPosition);
-          yPosition += 5;
-
-          doc.setTextColor(34, 139, 34);
-          doc.setFont("helvetica", "bold");
-          doc.text(`📌 Projects:`, 20, yPosition);
-          yPosition += 5;
-
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(33, 37, 41);
-          update.projects.forEach(project => {
-            doc.text(`• ${cleanText(project.projectName)}: ${project.taskCount} tasks`, 25, yPosition);
-            yPosition += 5;
+        if (updateText) {
+          // Split text by actual line breaks first
+          const paragraphs = updateText.split('\n');
+          
+          paragraphs.forEach((paragraph, paragraphIndex) => {
+            if (paragraph.trim()) { // Only process non-empty paragraphs
+              // Split paragraph into lines that fit the page width
+              const lines = doc.splitTextToSize(paragraph.trim(), maxWidth);
+              
+              // Add each line with proper spacing
+              lines.forEach((line) => {
+                // Check if we need a new page for this line
+                if (yPosition > pageHeight - 30) {
+                  doc.addPage();
+                  yPosition = 30;
+                }
+                
+                doc.text(line, margin, yPosition);
+                yPosition += 5; // Reduced line height for better spacing
+              });
+            }
+            
+            // Add extra space between paragraphs (but not after the last one)
+            if (paragraphIndex < paragraphs.length - 1 && paragraph.trim()) {
+              yPosition += 3;
+            }
           });
         }
 
-        yPosition += 10;
+        // Projects section
+        if (update.projects && update.projects.length > 0) {
+          yPosition += 8; // Extra space before projects
+
+          // Check if we need a new page for projects section
+          if (yPosition > pageHeight - 40) {
+            doc.addPage();
+            yPosition = 30;
+          }
+
+          // Draw separator line
+          doc.setDrawColor(200, 200, 200);
+          doc.line(margin, yPosition, margin + maxWidth, yPosition);
+          yPosition += 8;
+
+          // Projects header
+          doc.setFontSize(11);
+          doc.setTextColor(34, 139, 34);
+          doc.setFont("helvetica", "bold");
+          doc.text("Projects:", margin, yPosition);
+          yPosition += 8;
+
+          // List projects
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(33, 37, 41);
+          
+          update.projects.forEach(project => {
+            // Check if we need a new page for this project
+            if (yPosition > pageHeight - 25) {
+              doc.addPage();
+              yPosition = 30;
+            }
+            
+            const projectName = cleanText(project.projectName) || 'Unnamed Project';
+            const taskText = `• ${projectName}: ${project.taskCount || 0} tasks`;
+            
+            // Handle long project names by splitting if needed
+            const projectLines = doc.splitTextToSize(taskText, maxWidth - 5);
+            projectLines.forEach((line, lineIndex) => {
+              if (yPosition > pageHeight - 25) {
+                doc.addPage();
+                yPosition = 30;
+              }
+              
+              doc.text(line, margin + 5, yPosition);
+              yPosition += 5;
+            });
+          });
+        }
+
+        yPosition += 15; // Space between updates
       });
 
-      // Chart data
-      const projectsPerDay = filteredUpdates.reduce((acc, update) => {
-        const date = new Date(update.created_at).toLocaleDateString();
-        acc[date] = acc[date] || {};
-        update.projects?.forEach(project => {
-          const name = cleanText(project.projectName);
-          acc[date][name] = (acc[date][name] || 0) + project.taskCount;
-        });
-        return acc;
-      }, {} as Record<string, Record<string, number>>);
+      // Save the PDF
+      const filename = `daily-updates-${start.toISOString().slice(0, 10)}-to-${end.toISOString().slice(0, 10)}.pdf`;
+      doc.save(filename);
 
-      const projectNames = [...new Set(
-        Object.values(projectsPerDay).flatMap(day => Object.keys(day))
-      )];
+      // Show success message
+      toast({
+        title: "Export Complete",
+        description: "PDF file has been downloaded successfully.",
+      });
 
-      const colorPalette = [
-        '#e6194b', '#3cb44b', '#ffe119', '#4363d8',
-        '#f58231', '#911eb4', '#46f0f0', '#f032e6',
-        '#bcf60c', '#fabebe', '#008080', '#e6beff',
-        '#9a6324', '#fffac8', '#800000', '#aaffc3',
-        '#808000', '#ffd8b1', '#000075', '#808080'
-      ];
-
-      const chartData = {
-        labels: Object.keys(projectsPerDay),
-        datasets: projectNames.map((projectName, i) => ({
-          label: projectName,
-          data: Object.keys(projectsPerDay).map(date => projectsPerDay[date][projectName] || 0),
-          backgroundColor: colorPalette[i % colorPalette.length],
-          borderColor: colorPalette[i % colorPalette.length],
-          borderWidth: 1,
-        })),
-      };
-
-      // Add chart section
-      if (yPosition > 180) {
-        doc.addPage();
-        yPosition = 30;
-      }
-
-      doc.setFontSize(14);
-      doc.setTextColor(40, 40, 80);
-      doc.setFont("helvetica", "bold");
-      doc.text("📊 Project Tasks Chart", 20, yPosition);
-      yPosition += 10;
-
-      await ChartJSBarChart(doc, chartData, yPosition);
-
-      // Final save
-      setTimeout(() => {
-        doc.save(`daily-updates-${start.toISOString().slice(0, 10)}-to-${end.toISOString().slice(0, 10)}.pdf`);
-
-        toast({
-          title: "Export Complete",
-          description: "PDF file has been downloaded successfully.",
-        });
-      }, 300);
-    } catch (error: any) {
-      console.error(error);
+    } catch (error) {
+      console.error('PDF Export Error:', error);
       toast({
         title: "Export Failed",
         description: `Failed to export PDF. Error: ${error.message}`,
@@ -861,7 +1165,30 @@ export const TodaysUpdate = () => {
     }
   };
 
-
+  const cleanText = (text) => {
+    if (!text) return '';
+    return text
+      // Remove emojis and special Unicode characters
+      .replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '')
+      // Remove other emoji ranges
+      .replace(/[\u{1F900}-\u{1F9FF}]|[\u{1FA70}-\u{1FAFF}]/gu, '')
+      // Remove control characters except newlines and carriage returns
+      .replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F\u007F-\u009F]/g, '')
+      // Remove problematic symbols like ‰ (per mille) and similar
+      .replace(/[‰‱%æ]/g, '')
+      // Normalize line breaks to \n
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      // Clean up multiple spaces but preserve single spaces
+      .replace(/[ \t]+/g, ' ')
+      // Clean up multiple newlines but preserve paragraph breaks
+      .replace(/\n{3,}/g, '\n\n')
+      // Trim whitespace from each line but preserve the line structure
+      .split('\n')
+      .map(line => line.trim())
+      .join('\n')
+      .trim();
+  };
 
   const exportToCSV = async () => {
     setIsExporting(true);
@@ -873,12 +1200,9 @@ export const TodaysUpdate = () => {
         date: new Date(update.created_at).toLocaleDateString(),
         time: new Date(update.created_at).toLocaleTimeString(),
         original_text: update.originalText || update.originalText || '',
-        formatted_update: update.formattedUpdate || update.formattedUpdate || ''
-          .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // remove non-printable characters
-          .replace(/[^\x00-\x7F]/g, '') // remove non-ASCII characters
-          .replace(/\p{Extended_Pictographic}/gu, '') // remove emojis
-          .replace(/(^\s+|\s+$)/g, ''), // remove leading and trailing whitespace
-        projects: update.projects?.map(p => `${p.projectName}:${p.taskCount}`).join('; ') || '',
+
+        formatted_update: cleanText(update.formattedUpdate || update.originalText || ''),
+        projects: update.projects?.map(p => `${cleanText(p.projectName)}:${p.taskCount}`).join('; ') || '',
         total_tasks: update.projects?.reduce((sum, p) => sum + p.taskCount, 0) || 0
       }));
       

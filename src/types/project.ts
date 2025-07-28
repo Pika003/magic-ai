@@ -10,6 +10,7 @@ export interface Project {
   update_frequency_days: number;
   created_at: string;
   updated_at: string;
+  live_link?: string;
 }
 
 export interface CreateProjectData {
@@ -18,6 +19,7 @@ export interface CreateProjectData {
   client_name?: string;
   client_email?: string;
   update_frequency_days: number;
+  live_link?: string;
 }
 
 export interface UpdateProjectData extends Partial<CreateProjectData> {

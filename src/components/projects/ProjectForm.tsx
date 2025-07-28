@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -36,6 +35,7 @@ const projectSchema = z.object({
   client_email: z.string().email('Invalid email').optional().or(z.literal('')),
   status: z.enum(['active', 'completed', 'on_hold', 'cancelled']).optional(),
   update_frequency_days: z.number().min(1, 'Update frequency must be at least 1 day'),
+  live_link: z.string().url('Invalid URL').optional(),
 });
 
 type ProjectFormData = z.infer<typeof projectSchema>;
@@ -66,6 +66,7 @@ export const ProjectForm = ({
       client_email: project?.client_email || '',
       status: project?.status || 'active',
       update_frequency_days: project?.update_frequency_days || 7,
+      live_link: project?.live_link || '',
     },
   });
 
@@ -78,6 +79,7 @@ export const ProjectForm = ({
         client_email: project.client_email || '',
         status: project.status,
         update_frequency_days: project.update_frequency_days,
+        live_link: project.live_link || '',
       });
     } else {
       form.reset({
@@ -87,18 +89,19 @@ export const ProjectForm = ({
         client_email: '',
         status: 'active',
         update_frequency_days: 7,
+        live_link: '',
       });
     }
   }, [project, form]);
 
   const handleSubmit = (data: ProjectFormData) => {
-    // Ensure required fields are present and properly typed
     const submitData: CreateProjectData & { status?: Project['status'] } = {
       name: data.name!,
       description: data.description,
       client_name: data.client_name,
       client_email: data.client_email,
       update_frequency_days: data.update_frequency_days!,
+      live_link: data.live_link,
       ...(isEditing && data.status && { status: data.status })
     };
     onSubmit(submitData);
@@ -181,6 +184,24 @@ export const ProjectForm = ({
               />
             </div>
 
+            <FormField
+              control={form.control}
+              name="live_link"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Live Link</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="url" 
+                      placeholder="https://example.com" 
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <div className="grid grid-cols-2 gap-4">
               {isEditing && (
                 <FormField
@@ -247,3 +268,4 @@ export const ProjectForm = ({
     </Dialog>
   );
 };
+
