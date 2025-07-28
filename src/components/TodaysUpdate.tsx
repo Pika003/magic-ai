@@ -79,9 +79,12 @@ interface ProjectEntry {
 }
 interface DailyUpdate {
   id: string;
+  originaltext?: string;
   originalText?: string;
+  formattedupdate?: string;
   formattedUpdate?: string;
   created_at: string;
+  userid?: string;
   userId?: string;
   projects: ProjectEntry[];
 }
@@ -169,7 +172,7 @@ export const TodaysUpdate = () => {
     const { data, error } = await (supabase as any)
       .from("daily_updates")
       .select()
-      .eq("userid", user?.id)
+      .eq("userId", user?.id)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -304,10 +307,10 @@ export const TodaysUpdate = () => {
       return;
     }
     const newUpdate = {
-      originaltext: inputText,
-      formattedupdate: formattedUpdate,
+      originalText: inputText,
+      formattedUpdate: formattedUpdate,
       created_at: new Date().toISOString(),
-      userid: user.id,
+      userId: user.id,
       projects,
     };
     const { data, error } = await (supabase as any)
@@ -416,7 +419,7 @@ export const TodaysUpdate = () => {
   // Edit update
   const openEditModal = (update: DailyUpdate) => {
     setUpdateBeingEdited(update);
-    setEditText(update.formattedUpdate || '');
+    setEditText(update.formattedUpdate || update.formattedUpdate || '');
     setEditProjects(update.projects && update.projects.length > 0 ? update.projects : [{ projectName: "", taskCount: 0 }]);
     setEditModalOpen(true);
   };
@@ -431,7 +434,7 @@ export const TodaysUpdate = () => {
     setIsEditSaving(true);
     const { error } = await (supabase as any)
       .from("daily_updates")
-      .update({ formattedupdate: editText, projects: editProjects })
+      .update({ formattedUpdate: editText, projects: editProjects })
       .eq("id", updateBeingEdited.id);
     setIsEditSaving(false);
     if (error) {
@@ -508,10 +511,10 @@ export const TodaysUpdate = () => {
     }
     setIsAddSaving(true);
     const newUpdate = {
-      originaltext: addOriginalText,
-      formattedupdate: addFormattedUpdate,
+      originalText: addOriginalText,
+      formattedUpdate: addFormattedUpdate,
       created_at: new Date(addCreatedAt).toISOString(),
-      userid: user.id,
+      userId: user.id,
       projects: addProjects,
     };
     const { error } = await (supabase as any)
@@ -609,19 +612,7 @@ export const TodaysUpdate = () => {
     });
   };
   
-  const cleanText = (text: string) => {
-    if (!text) return '';
-    return text
-      .replace(/[\u{1F600}-\u{1F64F}]/gu, '') // Emoticons
-      .replace(/[\u{1F300}-\u{1F5FF}]/gu, '') // Misc Symbols and Pictographs
-      .replace(/[\u{1F680}-\u{1F6FF}]/gu, '') // Transport and Map
-      .replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '') // Regional Indicators
-      .replace(/[\u{2600}-\u{26FF}]/gu, '')   // Misc symbols
-      .replace(/[\u{2700}-\u{27BF}]/gu, '')   // Dingbats
-      .replace(/\p{Extended_Pictographic}/gu, '') // All other emojis
-      .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Control characters
-      .trim();
-  };
+  const cleanText = (text: string) => text.replace(/\p{Extended_Pictographic}/gu, '');
 
   const ChartJSBarChart = async (
     doc: jsPDF,
@@ -770,9 +761,9 @@ export const TodaysUpdate = () => {
 
         const lines = doc.splitTextToSize(
           update.formattedUpdate
-            ? cleanText(update.formattedUpdate)
+            ? cleanText(update.formattedUpdate.replace(/[\u0000-\u001F]/g, ''))
             : update.originalText
-            ? cleanText(update.originalText)
+            ? cleanText(update.originalText.replace(/[\u0000-\u001F]/g, ''))
             : '',
           170
         );
@@ -881,9 +872,13 @@ export const TodaysUpdate = () => {
       const csvData = filteredUpdates.map(update => ({
         date: new Date(update.created_at).toLocaleDateString(),
         time: new Date(update.created_at).toLocaleTimeString(),
-        original_text: cleanText(update.originalText || ''),
-        formatted_update: cleanText(update.formattedUpdate || ''),
-        projects: update.projects?.map(p => `${cleanText(p.projectName)}:${p.taskCount}`).join('; ') || '',
+        original_text: update.originalText || update.originalText || '',
+        formatted_update: update.formattedUpdate || update.formattedUpdate || ''
+          .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // remove non-printable characters
+          .replace(/[^\x00-\x7F]/g, '') // remove non-ASCII characters
+          .replace(/\p{Extended_Pictographic}/gu, '') // remove emojis
+          .replace(/(^\s+|\s+$)/g, ''), // remove leading and trailing whitespace
+        projects: update.projects?.map(p => `${p.projectName}:${p.taskCount}`).join('; ') || '',
         total_tasks: update.projects?.reduce((sum, p) => sum + p.taskCount, 0) || 0
       }));
       
@@ -1245,11 +1240,11 @@ export const TodaysUpdate = () => {
                                 {new Date(update.created_at).toLocaleString()}
                               </span>
                               <div className="flex gap-2">
-                                 <Button
-                                   variant="outline"
-                                   size="sm"
-                                   onClick={() => copyToClipboard(update.formattedUpdate || '')}
-                                 >
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => copyToClipboard(update.formattedUpdate || update.formattedUpdate || '')}
+                                >
                                   <Copy className="w-4 h-4" />
                                 </Button>
                                 <Button
