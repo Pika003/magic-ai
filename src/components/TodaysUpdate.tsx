@@ -30,6 +30,7 @@ Chart.register(
   Legend
 );
 
+
 import {
   Calendar,
   MessageSquare,
@@ -48,7 +49,6 @@ import { toast } from "@/hooks/use-toast";
 import {
   formatDailyUpdateWithAI,
   generateCommitMessageWithAI,
-  generateClientUpdateWithAI
 } from "@/services/openaiService";
 import { Layout } from "@/components/Layout";
 import { useUsageTracking } from "@/hooks/useUsageTracking";
@@ -86,9 +86,12 @@ interface ProjectEntry {
 }
 interface DailyUpdate {
   id: string;
+  originaltext?: string;
   originalText?: string;
+  formattedupdate?: string;
   formattedUpdate?: string;
   created_at: string;
+  userid?: string;
   userId?: string;
   projects: ProjectEntry[];
 }
@@ -135,14 +138,6 @@ export const TodaysUpdate = () => {
   const [addTaskCount, setAddTaskCount] = useState(0);
   const [editProjectName, setEditProjectName] = useState("");
   const [editTaskCount, setEditTaskCount] = useState(0);
-  
-  // Client Update states
-  const [selectedProject, setSelectedProject] = useState<any>(null);
-  const [updateDuration, setUpdateDuration] = useState<'7days' | '30days' | 'custom'>('7days');
-  const [clientStartDate, setClientStartDate] = useState(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
-  const [clientEndDate, setClientEndDate] = useState(new Date().toISOString().slice(0, 10));
-  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
-  const [clientReport, setClientReport] = useState("");
 
   const { user } = useAuth();
 
@@ -160,7 +155,7 @@ export const TodaysUpdate = () => {
         setAllProjects(projects);
       })
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -431,7 +426,7 @@ export const TodaysUpdate = () => {
   // Edit update
   const openEditModal = (update: DailyUpdate) => {
     setUpdateBeingEdited(update);
-    setEditText(update.formattedUpdate || update.originalText || '');
+    setEditText(update.formattedUpdate || update.formattedUpdate || '');
     setEditProjects(update.projects && update.projects.length > 0 ? update.projects : [{ projectName: "", taskCount: 0 }]);
     setEditModalOpen(true);
   };
@@ -511,89 +506,6 @@ export const TodaysUpdate = () => {
     setAddFormattedUpdate("");
     setAddCreatedAt(new Date().toISOString().slice(0, 16));
     setAddProjects([{ projectName: "", taskCount: 0 }]);
-  };
-
-  // Generate Client Report function
-  const generateClientReport = async () => {
-    if (!selectedProject) return;
-    
-    setIsGeneratingReport(true);
-    try {
-      // Calculate date range
-      const endDate = new Date();
-      let startDate = new Date();
-      
-      if (updateDuration === '7days') {
-        startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      } else if (updateDuration === '30days') {
-        startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-      } else {
-        startDate = new Date(clientStartDate);
-        endDate.setTime(new Date(clientEndDate).getTime());
-      }
-
-      // Fetch daily updates for the selected project within date range
-      const { data: updates, error } = await (supabase as any)
-        .from("daily_updates")
-        .select()
-        .eq("userId", user?.id)
-        .gte("created_at", startDate.toISOString())
-        .lte("created_at", endDate.toISOString())
-        .order("created_at", { ascending: true });
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      // Filter updates related to the selected project
-      const projectUpdates = (updates || []).filter(update => 
-        update.projects && 
-        update.projects.some(proj => 
-          proj.projectName && 
-          proj.projectName.toLowerCase().includes(selectedProject.name.toLowerCase())
-        )
-      );
-
-      // Compile daily updates text
-      const dailyUpdatesText = projectUpdates.map(update => {
-        const date = new Date(update.created_at).toLocaleDateString();
-        const relevantProjects = update.projects.filter(proj => 
-          proj.projectName && 
-          proj.projectName.toLowerCase().includes(selectedProject.name.toLowerCase())
-        );
-        
-        return `${date}: ${update.formattedUpdate || update.originalText}\nTasks completed: ${relevantProjects.reduce((sum, proj) => sum + (proj.taskCount || 0), 0)}`;
-      }).join('\n\n');
-
-      // Track usage before making API call
-      const usageSuccess = await incrementUsage("client_update_generation");
-      if (!usageSuccess) {
-        return;
-      }
-
-      // Generate client report with AI
-      const report = await generateClientUpdateWithAI(
-        dailyUpdatesText || "No specific updates found for this project in the selected period.",
-        selectedProject.client_name || "Valued Client",
-        selectedProject.live_link || "",
-        user?.user_metadata?.full_name || "Developer"
-      );
-
-      setClientReport(report);
-      
-      toast({
-        title: "Client Report Generated!",
-        description: "Your professional client report is ready.",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to generate client report. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsGeneratingReport(false);
-    }
   };
   const handleAddSave = async () => {
     if (!addOriginalText.trim() || !addFormattedUpdate.trim() || addProjects.some(p => !p.projectName.trim())) {
@@ -712,6 +624,7 @@ export const TodaysUpdate = () => {
     setIsExporting(true);
     try {
       const doc = new jsPDF();
+
       const filteredUpdates = getFilteredUpdates();
       const { start, end } = getDateRange();
 
@@ -719,18 +632,316 @@ export const TodaysUpdate = () => {
       const cleanText = (text) => {
         if (!text) return '';
         return text
+          // Remove emojis and special Unicode characters
           .replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '')
+          // Remove other emoji ranges
           .replace(/[\u{1F900}-\u{1F9FF}]|[\u{1FA70}-\u{1FAFF}]/gu, '')
+          // Remove control characters except newlines and carriage returns
           .replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F\u007F-\u009F]/g, '')
+          // Remove problematic symbols like ‰ (per mille) and similar
           .replace(/[‰‱%æ]/g, '')
+          // Normalize line breaks to \n
           .replace(/\r\n/g, '\n')
           .replace(/\r/g, '\n')
+          // Clean up multiple spaces but preserve single spaces
           .replace(/[ \t]+/g, ' ')
+          // Clean up multiple newlines but preserve paragraph breaks
           .replace(/\n{3,}/g, '\n\n')
+          // Trim whitespace from each line but preserve the line structure
           .split('\n')
           .map(line => line.trim())
           .join('\n')
           .trim();
+      };
+
+      // Enhanced ChartJSBarChart function
+      const ChartJSBarChart = async (doc, data, yPosition) => {
+        return new Promise((resolve) => {
+          const canvas = document.createElement('canvas');
+          canvas.width = 1600;
+          canvas.height = 800;
+          const ctx = canvas.getContext('2d');
+
+          // Sort the data by date to ensure proper order
+          const sortedLabels = [...data.labels].sort((a, b) => new Date(a) - new Date(b));
+          
+          // Reorder the datasets data according to sorted labels
+          const sortedDatasets = data.datasets.map(dataset => ({
+            ...dataset,
+            data: sortedLabels.map(label => {
+              const originalIndex = data.labels.indexOf(label);
+              return dataset.data[originalIndex] || 0;
+            })
+          }));
+
+          const sortedData = {
+            labels: sortedLabels,
+            datasets: sortedDatasets
+          };
+
+          const chart = new Chart(ctx, {
+            type: 'bar',
+            data: sortedData,
+            options: {
+              responsive: false,
+              animation: false,
+              categoryPercentage: 0.8, // Reduce gap between date groups
+              barPercentage: 0.9, // Reduce gap between bars in same group
+              plugins: {
+                title: {
+                  display: true,
+                  text: 'Project Tasks Chart',
+                  font: {
+                    size: 36,
+                    weight: 'bold',
+                    family: 'Arial',
+                  },
+                  padding: {
+                    top: 20,
+                    bottom: 40,
+                  },
+                  color: '#2c3e50',
+                },
+                legend: {
+                  position: 'bottom',
+                  labels: {
+                    font: {
+                      size: 16,
+                      weight: 'normal',
+                      family: 'Arial',
+                    },
+                    color: '#2c3e50',
+                    padding: 15,
+                    boxWidth: 20,
+                    // Filter out empty datasets from legend
+                    filter: function(legendItem, chartData) {
+                      const dataset = chartData.datasets[legendItem.datasetIndex];
+                      return dataset.data.some(value => value > 0);
+                    }
+                  },
+                },
+              },
+              scales: {
+                x: {
+                  title: {
+                    display: true,
+                    text: 'Date',
+                    font: {
+                      size: 18,
+                      weight: 'bold'
+                    },
+                    color: '#2c3e50'
+                  },
+                  ticks: {
+                    maxRotation: 45,
+                    minRotation: 0,
+                    autoSkip: false, // Show all dates
+                    font: {
+                      size: 14
+                    },
+                    color: '#2c3e50'
+                  },
+                  grid: {
+                    display: false
+                  }
+                },
+                y: {
+                  beginAtZero: true,
+                  title: {
+                    display: true,
+                    text: 'Number of Tasks',
+                    font: {
+                      size: 18,
+                      weight: 'bold'
+                    },
+                    color: '#2c3e50'
+                  },
+                  ticks: {
+                    stepSize: 1,
+                    font: {
+                      size: 14
+                    },
+                    color: '#2c3e50'
+                  },
+                  grid: {
+                    color: '#e0e0e0'
+                  }
+                },
+              },
+              elements: {
+                bar: {
+                  borderWidth: 1,
+                  borderSkipped: false
+                }
+              }
+            },
+            plugins: [{
+              id: 'done',
+              afterRender: () => {
+                setTimeout(() => {
+                  const chartImage = canvas.toDataURL('image/png', 1.0);
+                  const pageWidth = doc.internal.pageSize.getWidth();
+                  const chartWidth = 170;
+                  const chartHeight = 85;
+                  const chartX = (pageWidth - chartWidth) / 2;
+
+                  doc.addImage(chartImage, 'PNG', chartX, yPosition, chartWidth, chartHeight);
+
+                  chart.destroy();
+                  canvas.remove();
+                  resolve();
+                }, 500);
+              }
+            }]
+          });
+        });
+      };
+
+      // Line chart function for individual project progress
+      const ChartJSLineChart = async (doc, data, yPosition) => {
+        return new Promise((resolve) => {
+          const canvas = document.createElement('canvas');
+          canvas.width = 1600;
+          canvas.height = 800;
+          const ctx = canvas.getContext('2d');
+
+          // Sort the data by date to ensure proper order
+          const sortedLabels = [...data.labels].sort((a, b) => new Date(a) - new Date(b));
+          
+          // Reorder the datasets data according to sorted labels
+          const sortedDatasets = data.datasets.map(dataset => ({
+            ...dataset,
+            data: sortedLabels.map(label => {
+              const originalIndex = data.labels.indexOf(label);
+              return dataset.data[originalIndex] || 0;
+            }),
+            fill: false,
+            borderWidth: 3,
+            pointRadius: 5,
+            pointHoverRadius: 7,
+            tension: 0.2 // Smooth curves
+          }));
+
+          const sortedData = {
+            labels: sortedLabels,
+            datasets: sortedDatasets
+          };
+
+          const chart = new Chart(ctx, {
+            type: 'line',
+            data: sortedData,
+            options: {
+              responsive: false,
+              animation: false,
+              plugins: {
+                title: {
+                  display: true,
+                  text: 'Individual Project Progress Over Time',
+                  font: {
+                    size: 36,
+                    weight: 'bold',
+                    family: 'Arial',
+                  },
+                  padding: {
+                    top: 20,
+                    bottom: 40,
+                  },
+                  color: '#2c3e50',
+                },
+                legend: {
+                  position: 'bottom',
+                  labels: {
+                    font: {
+                      size: 16,
+                      weight: 'normal',
+                      family: 'Arial',
+                    },
+                    color: '#2c3e50',
+                    padding: 15,
+                    boxWidth: 20,
+                    usePointStyle: true,
+                    // Filter out empty datasets from legend
+                    filter: function(legendItem, chartData) {
+                      const dataset = chartData.datasets[legendItem.datasetIndex];
+                      return dataset.data.some(value => value > 0);
+                    }
+                  },
+                },
+              },
+              scales: {
+                x: {
+                  title: {
+                    display: true,
+                    text: 'Date',
+                    font: {
+                      size: 18,
+                      weight: 'bold'
+                    },
+                    color: '#2c3e50'
+                  },
+                  ticks: {
+                    maxRotation: 45,
+                    minRotation: 0,
+                    autoSkip: false,
+                    font: {
+                      size: 14
+                    },
+                    color: '#2c3e50'
+                  },
+                  grid: {
+                    color: '#f0f0f0'
+                  }
+                },
+                y: {
+                  beginAtZero: true,
+                  title: {
+                    display: true,
+                    text: 'Number of Tasks',
+                    font: {
+                      size: 18,
+                      weight: 'bold'
+                    },
+                    color: '#2c3e50'
+                  },
+                  ticks: {
+                    stepSize: 1,
+                    font: {
+                      size: 14
+                    },
+                    color: '#2c3e50'
+                  },
+                  grid: {
+                    color: '#f0f0f0'
+                  }
+                },
+              },
+              elements: {
+                point: {
+                  backgroundColor: '#fff',
+                  borderWidth: 2
+                }
+              }
+            },
+            plugins: [{
+              id: 'done',
+              afterRender: () => {
+                setTimeout(() => {
+                  const chartImage = canvas.toDataURL('image/png', 1.0);
+                  const pageWidth = doc.internal.pageSize.getWidth();
+                  const chartWidth = 170;
+                  const chartHeight = 85;
+                  const chartX = (pageWidth - chartWidth) / 2;
+
+                  doc.addImage(chartImage, 'PNG', chartX, yPosition, chartWidth, chartHeight);
+
+                  chart.destroy();
+                  canvas.remove();
+                  resolve();
+                }, 500);
+              }
+            }]
+          });
+        });
       };
 
       // PDF Title
@@ -750,49 +961,203 @@ export const TodaysUpdate = () => {
       const pageHeight = doc.internal.pageSize.height;
       const margin = 20;
       const rightMargin = 20;
-      const maxWidth = doc.internal.pageSize.width - margin - rightMargin;
+      const maxWidth = doc.internal.pageSize.width - margin - rightMargin; // Fixed width calculation
 
-      // Updates content
-      filteredUpdates.forEach((update, index) => {
-        if (yPosition > pageHeight - 40) {
-          doc.addPage();
-          yPosition = 20;
-        }
-
+      // Chart section
+      const projectsPerDay = filteredUpdates.reduce((acc, update) => {
         const date = new Date(update.created_at).toLocaleDateString();
-        const cleanedUpdate = cleanText(update.formattedUpdate || update.originalText);
+        acc[date] = acc[date] || {};
+        update.projects?.forEach(project => {
+          const name = cleanText(project.projectName) || 'Unnamed Project';
+          acc[date][name] = (acc[date][name] || 0) + (project.taskCount || 0);
+        });
+        return acc;
+      }, {});
+
+      const projectNames = [...new Set(
+        Object.values(projectsPerDay).flatMap(day => Object.keys(day))
+      )];
+
+      if (projectNames.length > 0) {
+        const colorPalette = [
+          '#e6194b', '#3cb44b', '#ffe119', '#4363d8',
+          '#f58231', '#911eb4', '#46f0f0', '#f032e6',
+          '#bcf60c', '#fabebe', '#008080', '#e6beff',
+          '#9a6324', '#fffac8', '#800000', '#aaffc3',
+          '#808000', '#ffd8b1', '#000075', '#808080'
+        ];
+
+        const chartData = {
+          labels: Object.keys(projectsPerDay),
+          datasets: projectNames.map((projectName, i) => ({
+            label: projectName,
+            data: Object.keys(projectsPerDay).map(date => projectsPerDay[date][projectName] || 0),
+            backgroundColor: colorPalette[i % colorPalette.length],
+            borderColor: colorPalette[i % colorPalette.length],
+            borderWidth: 1,
+          })),
+        };
+
+        // Add bar chart
+        if (yPosition > pageHeight - 100) {
+          doc.addPage();
+          yPosition = 30;
+        }
 
         doc.setFontSize(14);
+        doc.setTextColor(40, 40, 80);
         doc.setFont("helvetica", "bold");
-        doc.text(`${date}`, margin, yPosition);
-        yPosition += 10;
+        doc.text("Project Tasks Chart", margin, yPosition);
+        yPosition += 20;
 
-        if (update.projects && update.projects.length > 0) {
-          doc.setFontSize(10);
-          doc.setFont("helvetica", "normal");
-          const projectText = update.projects.map(p => `${p.projectName}: ${p.taskCount} tasks`).join(', ');
-          const projectLines = doc.splitTextToSize(cleanText(projectText), maxWidth);
-          doc.text(projectLines, margin, yPosition);
-          yPosition += projectLines.length * 5 + 5;
+        // Use the embedded ChartJSBarChart function
+        await ChartJSBarChart(doc, chartData, yPosition);
+        yPosition += 100; // Space after bar chart
+
+        // Add line chart for individual project progress
+        if (yPosition > pageHeight - 100) {
+          doc.addPage();
+          yPosition = 30;
         }
 
+        doc.setFontSize(14);
+        doc.setTextColor(40, 40, 80);
+        doc.setFont("helvetica", "bold");
+        doc.text("Project Progress Over Time", margin, yPosition);
+        yPosition += 20;
+
+        // Use the embedded ChartJSLineChart function
+        await ChartJSLineChart(doc, chartData, yPosition);
+      }
+
+      yPosition += 150;
+
+      //Daily Updates
+      filteredUpdates.forEach((update, index) => {
+        // Check if we need a new page
+        if (yPosition > pageHeight - 60) {
+          doc.addPage();
+          yPosition = 30;
+        }
+
+        // Update header
+        doc.setFontSize(14);
+        doc.setTextColor(40, 40, 80);
+        doc.setFont("helvetica", "bold");
+        doc.text(`Update ${index + 1} - ${new Date(update.created_at).toLocaleDateString()}`, margin, yPosition);
+        yPosition += 15;
+
+        // Update content
         doc.setFontSize(10);
+        doc.setTextColor(33, 37, 41);
         doc.setFont("helvetica", "normal");
-        const lines = doc.splitTextToSize(cleanedUpdate, maxWidth);
-        doc.text(lines, margin, yPosition);
-        yPosition += lines.length * 5 + 15;
+
+        // Get the update text and clean it
+        let updateText = '';
+        if (update.formattedUpdate) {
+          updateText = cleanText(update.formattedUpdate);
+        } else if (update.originalText) {
+          updateText = cleanText(update.originalText);
+        }
+
+        if (updateText) {
+          // Split text by actual line breaks first
+          const paragraphs = updateText.split('\n');
+          
+          paragraphs.forEach((paragraph, paragraphIndex) => {
+            if (paragraph.trim()) { // Only process non-empty paragraphs
+              // Split paragraph into lines that fit the page width
+              const lines = doc.splitTextToSize(paragraph.trim(), maxWidth);
+              
+              // Add each line with proper spacing
+              lines.forEach((line) => {
+                // Check if we need a new page for this line
+                if (yPosition > pageHeight - 30) {
+                  doc.addPage();
+                  yPosition = 30;
+                }
+                
+                doc.text(line, margin, yPosition);
+                yPosition += 5; // Reduced line height for better spacing
+              });
+            }
+            
+            // Add extra space between paragraphs (but not after the last one)
+            if (paragraphIndex < paragraphs.length - 1 && paragraph.trim()) {
+              yPosition += 3;
+            }
+          });
+        }
+
+        // Projects section
+        if (update.projects && update.projects.length > 0) {
+          yPosition += 8; // Extra space before projects
+
+          // Check if we need a new page for projects section
+          if (yPosition > pageHeight - 40) {
+            doc.addPage();
+            yPosition = 30;
+          }
+
+          // Draw separator line
+          doc.setDrawColor(200, 200, 200);
+          doc.line(margin, yPosition, margin + maxWidth, yPosition);
+          yPosition += 8;
+
+          // Projects header
+          doc.setFontSize(11);
+          doc.setTextColor(34, 139, 34);
+          doc.setFont("helvetica", "bold");
+          doc.text("Projects:", margin, yPosition);
+          yPosition += 8;
+
+          // List projects
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(33, 37, 41);
+          
+          update.projects.forEach(project => {
+            // Check if we need a new page for this project
+            if (yPosition > pageHeight - 25) {
+              doc.addPage();
+              yPosition = 30;
+            }
+            
+            const projectName = cleanText(project.projectName) || 'Unnamed Project';
+            const taskText = `• ${projectName}: ${project.taskCount || 0} tasks`;
+            
+            // Handle long project names by splitting if needed
+            const projectLines = doc.splitTextToSize(taskText, maxWidth - 5);
+            projectLines.forEach((line, lineIndex) => {
+              if (yPosition > pageHeight - 25) {
+                doc.addPage();
+                yPosition = 30;
+              }
+              
+              doc.text(line, margin + 5, yPosition);
+              yPosition += 5;
+            });
+          });
+        }
+
+        yPosition += 15; // Space between updates
       });
 
-      doc.save(`daily-updates-${start.toISOString().slice(0, 10)}-${end.toISOString().slice(0, 10)}.pdf`);
-      
+      // Save the PDF
+      const filename = `daily-updates-${start.toISOString().slice(0, 10)}-to-${end.toISOString().slice(0, 10)}.pdf`;
+      doc.save(filename);
+
+      // Show success message
       toast({
-        title: "Export Successful",
-        description: "PDF has been downloaded successfully.",
+        title: "Export Complete",
+        description: "PDF file has been downloaded successfully.",
       });
+
     } catch (error) {
+      console.error('PDF Export Error:', error);
       toast({
         title: "Export Failed",
-        description: "Failed to generate PDF. Please try again.",
+        description: `Failed to export PDF. Error: ${error.message}`,
         variant: "destructive",
       });
     } finally {
@@ -800,90 +1165,133 @@ export const TodaysUpdate = () => {
     }
   };
 
-  const exportToCSV = () => {
-    const filteredUpdates = getFilteredUpdates();
-    const { start, end } = getDateRange();
+  const cleanText = (text) => {
+    if (!text) return '';
+    return text
+      // Remove emojis and special Unicode characters
+      .replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '')
+      // Remove other emoji ranges
+      .replace(/[\u{1F900}-\u{1F9FF}]|[\u{1FA70}-\u{1FAFF}]/gu, '')
+      // Remove control characters except newlines and carriage returns
+      .replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F\u007F-\u009F]/g, '')
+      // Remove problematic symbols like ‰ (per mille) and similar
+      .replace(/[‰‱%æ]/g, '')
+      // Normalize line breaks to \n
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      // Clean up multiple spaces but preserve single spaces
+      .replace(/[ \t]+/g, ' ')
+      // Clean up multiple newlines but preserve paragraph breaks
+      .replace(/\n{3,}/g, '\n\n')
+      // Trim whitespace from each line but preserve the line structure
+      .split('\n')
+      .map(line => line.trim())
+      .join('\n')
+      .trim();
+  };
 
-    // Helper function to clean text - remove emojis and control characters
-    const cleanText = (text) => {
-      if (!text) return '';
-      return text
-        .replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '')
-        .replace(/[\u{1F900}-\u{1F9FF}]|[\u{1FA70}-\u{1FAFF}]/gu, '')
-        .replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F\u007F-\u009F]/g, '')
-        .replace(/[‰‱%æ]/g, '')
-        .replace(/\r\n/g, ' ')
-        .replace(/\r/g, ' ')
-        .replace(/\n/g, ' ')
-        .replace(/[ \t]+/g, ' ')
-        .trim();
-    };
+  const exportToCSV = async () => {
+    setIsExporting(true);
+    try {
+      const filteredUpdates = getFilteredUpdates();
+      const { start, end } = getDateRange();
+      
+      const csvData = filteredUpdates.map(update => ({
+        date: new Date(update.created_at).toLocaleDateString(),
+        time: new Date(update.created_at).toLocaleTimeString(),
+        original_text: update.originalText || update.originalText || '',
 
-    const csvData = filteredUpdates.map(update => ({
-      Date: new Date(update.created_at).toLocaleDateString(),
-      'Original Text': cleanText(update.originalText || ''),
-      'Formatted Update': cleanText(update.formattedUpdate || ''),
-      Projects: update.projects ? update.projects.map(p => `${p.projectName}: ${p.taskCount} tasks`).join('; ') : '',
-      'Total Tasks': update.projects ? update.projects.reduce((sum, p) => sum + p.taskCount, 0) : 0
-    }));
-
-    const csv = Papa.unparse(csvData);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `daily-updates-${start.toISOString().slice(0, 10)}-${end.toISOString().slice(0, 10)}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    toast({
-      title: "Export Successful",
-      description: "CSV has been downloaded successfully.",
-    });
+        formatted_update: cleanText(update.formattedUpdate || update.originalText || ''),
+        projects: update.projects?.map(p => `${cleanText(p.projectName)}:${p.taskCount}`).join('; ') || '',
+        total_tasks: update.projects?.reduce((sum, p) => sum + p.taskCount, 0) || 0
+      }));
+      
+      const csv = Papa.unparse(csvData);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `daily-updates-${start.toISOString().slice(0, 10)}-to-${end.toISOString().slice(0, 10)}.csv`;
+      link.click();
+      
+      toast({
+        title: "Export Complete",
+        description: "CSV file has been downloaded successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "Failed to export CSV. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleExport = () => {
-    setIsExporting(true);
     if (exportFormat === 'pdf') {
       exportToPDF();
     } else {
       exportToCSV();
-      setIsExporting(false);
     }
     setExportModalOpen(false);
   };
 
   return (
-    <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
-        {/* Header */}
-        <div className="max-w-4xl mx-auto mb-8">
+    <div className="w-full px-2 md:px-4 pt-10">
+      <div className="max-w-7xl mx-auto">
+        {/* Header Section */}
+        <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-slate-800 mb-2">
-            Daily Updates & Reports
+            Today's Update
           </h1>
           <p className="text-slate-600">
-            Format your daily updates with AI and generate professional client reports
+            Format your daily updates and generate commit messages with AI
           </p>
+          {!isSlackConnected && (
+            <button
+              onClick={handleConnectSlack}
+              className="mt-4 bg-[#4A154B] hover:bg-[#350d36] text-white px-4 py-2 rounded"
+            >
+              <img
+                src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/slack.svg"
+                alt="Slack"
+                className="w-5 h-5 mr-2 inline"
+              />
+              Connect Slack
+            </button>
+          )}
+          {isSlackConnected && (
+            <div className="mt-4 text-green-600 font-medium flex items-center justify-center gap-2">
+              <img
+                src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/slack.svg"
+                alt="Slack"
+                className="w-5 h-5 inline"
+              />
+              Slack Connected
+            </div>
+          )}
         </div>
 
-        {/* Main Content */}
-        <div className="max-w-4xl mx-auto space-y-8">
-          {/* Daily Update Section */}
+        {/* Main Input/Output Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Input Card */}
           <Card className="border-slate-200">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <MessageSquare className="w-5 h-5 text-blue-600" />
-                <span>Today's Update</span>
+                <MessageSquare className="w-5 h-5 text-blue-500" />
+                <span>Daily Update Input</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Projects */}
+              <Textarea
+                placeholder="Enter your daily updates here... completed task 1, worked on task 2, fixed bug in task 3..."
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                className="min-h-32 resize-none border-slate-200 focus:border-blue-500"
+              />
               <div>
-                <label className="text-sm font-medium text-slate-700 mb-2 block">
-                  Projects & Tasks
-                </label>
+                <label className="block text-sm font-medium mb-1">Projects</label>
                 {projects.map((proj, idx) => (
                   <div key={idx} className="flex gap-2 mb-2 items-center">
                     <Select
@@ -901,6 +1309,16 @@ export const TodaysUpdate = () => {
                         ))}
                       </SelectContent>
                     </Select>
+                    {/* <div className="mt-2">
+                      <label className="block text-sm font-medium mb-1">Or add new project</label>
+                      <Input
+                        placeholder="Add new project name"
+                        type="text"
+                        value={newProjectName[idx]}
+                        onChange={e => setNewProjectName(prev => prev.map((v, i) => i === idx ? e.target.value : v))}
+                        className="border-slate-200 focus:border-blue-500"
+                      />
+                    </div> */}
                     <Input
                       type="number"
                       placeholder="Tasks"
@@ -916,23 +1334,13 @@ export const TodaysUpdate = () => {
                   </div>
                 ))}
               </div>
-              {/* Input */}
-              <div>
-                <label className="text-sm font-medium text-slate-700 mb-2 block">
-                  Original Update
-                </label>
-                <Textarea
-                  placeholder="Describe what you worked on today..."
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  className="min-h-28 resize-none border-slate-200 focus:border-blue-500"
-                />
-              </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center space-x-2">
                 <Button
                   onClick={() => processUpdate(false)}
-                  disabled={isProcessing || !inputText.trim() || hasReachedLimit}
-                  className="bg-blue-600 hover:bg-blue-700"
+                  disabled={
+                    isProcessing || !inputText.trim() || hasReachedLimit
+                  }
+                  className="bg-blue-500 hover:bg-blue-600"
                 >
                   {isProcessing ? (
                     <>
@@ -941,7 +1349,7 @@ export const TodaysUpdate = () => {
                     </>
                   ) : (
                     <>
-                      <MessageSquare className="w-4 h-4 mr-2" />
+                      <Calendar className="w-4 h-4 mr-2" />
                       Format with AI
                     </>
                   )}
@@ -949,190 +1357,72 @@ export const TodaysUpdate = () => {
                 <Button
                   variant="outline"
                   onClick={handleRefresh}
-                  disabled={isProcessing || !formattedUpdate}
+                  disabled={
+                    isProcessing || !inputText.trim() || hasReachedLimit
+                  }
                 >
-                  <RefreshCw className="w-4 h-4" />
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Refresh
                 </Button>
               </div>
-              {formattedUpdate && (
-                <div className="space-y-3">
-                  <div className="bg-green-50 border border-green-200 rounded p-4">
-                    <div className="text-green-800 whitespace-pre-wrap">
-                      {formattedUpdate}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button onClick={saveUpdate} className="bg-green-600 hover:bg-green-700">
-                      <Save className="w-4 h-4 mr-2" />
-                      Save Update
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleRefresh}
-                      disabled={isProcessing}
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => copyToClipboard(formattedUpdate)}
-                    >
-                      <Copy className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={openSlackDialog}
-                      disabled={isProcessing || !formattedUpdate}
-                    >
-                      <img
-                        src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/slack.svg"
-                        alt="Slack"
-                        className="w-4 h-4 mr-1 inline"
-                      />
-                      Send to Slack
-                    </Button>
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
 
-          {/* CLIENT UPDATE SECTION */}
+          {/* Output Card */}
           <Card className="border-slate-200">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <FileText className="w-5 h-5 text-green-600" />
-                <span>Client Update Generator</span>
+                <Calendar className="w-5 h-5 text-green-500" />
+                <span>AI Formatted Update</span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Project Selection */}
-              <div>
-                <label className="text-sm font-medium text-slate-700 mb-2 block">
-                  Select Project
-                </label>
-                <Select value={selectedProject?.id || ""} onValueChange={(value) => {
-                  const project = allProjects.find(p => p.id === value);
-                  setSelectedProject(project);
-                }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose a project" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allProjects.map(project => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.name} {project.client_name && `(${project.client_name})`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <CardContent>
+              <div className="min-h-32 p-4 bg-green-50 border border-green-200 rounded-lg mb-4">
+                {formattedUpdate ? (
+                  <div className="text-slate-800 whitespace-pre-wrap">
+                    {formattedUpdate}
+                  </div>
+                ) : (
+                  <p className="text-slate-400 italic">
+                    Formatted daily update will appear here...
+                  </p>
+                )}
               </div>
 
-              {/* Duration Selection */}
-              {selectedProject && (
-                <div>
-                  <label className="text-sm font-medium text-slate-700 mb-2 block">
-                    Update Period
-                  </label>
-                  <Select value={updateDuration} onValueChange={setUpdateDuration}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="7days">Last 7 Days</SelectItem>
-                      <SelectItem value="30days">Last 30 Days</SelectItem>
-                      <SelectItem value="custom">Custom Range</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {/* Custom Date Range */}
-              {selectedProject && updateDuration === 'custom' && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-slate-700 mb-1 block">
-                      Start Date
-                    </label>
-                    <Input
-                      type="date"
-                      value={clientStartDate}
-                      onChange={(e) => setClientStartDate(e.target.value)}
+              {formattedUpdate && (
+                <div className="flex space-x-2">
+                  <Button
+                    onClick={saveUpdate}
+                    className="flex-1 bg-green-500 hover:bg-green-600"
+                  >
+                    <Save className="w-4 h-4 mr-2" />
+                    Save Update
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copyToClipboard(formattedUpdate)}
+                  >
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={openSlackDialog}
+                    disabled={isProcessing || !formattedUpdate}
+                  >
+                    <img
+                      src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/slack.svg"
+                      alt="Slack"
+                      className="w-4 h-4 mr-1 inline"
                     />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-slate-700 mb-1 block">
-                      End Date
-                    </label>
-                    <Input
-                      type="date"
-                      value={clientEndDate}
-                      onChange={(e) => setClientEndDate(e.target.value)}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Generate Button */}
-              {selectedProject && (
-                <Button
-                  onClick={generateClientReport}
-                  disabled={isGeneratingReport || hasReachedLimit}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  {isGeneratingReport ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                      Generating Report...
-                    </>
-                  ) : (
-                    <>
-                      <FileText className="w-4 h-4 mr-2" />
-                      Generate Client Report
-                    </>
-                  )}
-                </Button>
-              )}
-
-              {/* Generated Report */}
-              {clientReport && (
-                <div className="space-y-3">
-                  <div className="bg-blue-50 border border-blue-200 rounded p-4">
-                    <div className="text-blue-800 whitespace-pre-wrap">
-                      {clientReport}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => copyToClipboard(clientReport)}
-                    >
-                      <Copy className="w-4 h-4" />
-                      Copy
-                    </Button>
-                    {selectedProject?.client_email && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const subject = encodeURIComponent(`Project Update: ${selectedProject.name}`);
-                          const body = encodeURIComponent(clientReport);
-                          window.open(`mailto:${selectedProject.client_email}?subject=${subject}&body=${body}`);
-                        }}
-                      >
-                        <Send className="w-4 h-4 mr-1" />
-                        Email to Client
-                      </Button>
-                    )}
-                  </div>
+                    Send to Slack
+                  </Button>
                 </div>
               )}
             </CardContent>
           </Card>
+        </div>
 
         {/* Git Commit Message Section */}
         <Card className="border-slate-200 mb-8">
@@ -1277,7 +1567,7 @@ export const TodaysUpdate = () => {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => copyToClipboard(update.formattedUpdate || update.originalText || '')}
+                                  onClick={() => copyToClipboard(update.formattedUpdate || update.formattedUpdate || '')}
                                 >
                                   <Copy className="w-4 h-4" />
                                 </Button>
@@ -1328,7 +1618,7 @@ export const TodaysUpdate = () => {
           </CardContent>
         </Card>
 
-        {/* Project Summary Card */}
+        {/* Project Summary Card - moved to end and beautified */}
         {projectSummaryList.length > 0 && (
           <Card className="mt-10 border-0 shadow-lg bg-gradient-to-br from-blue-50 to-green-50">
             <CardHeader className="pb-2 flex flex-row items-center gap-2 border-b border-blue-100">
@@ -1357,85 +1647,6 @@ export const TodaysUpdate = () => {
         )}
       </div>
 
-      {/* Export Modal */}
-      <Dialog open={exportModalOpen} onOpenChange={setExportModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Export Daily Updates</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Export Format</label>
-              <Select value={exportFormat} onValueChange={setExportFormat}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pdf">PDF</SelectItem>
-                  <SelectItem value="csv">CSV</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Date Range</label>
-              <Select value={exportRange} onValueChange={setExportRange}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7days">Last 7 Days</SelectItem>
-                  <SelectItem value="1month">Last 1 Month</SelectItem>
-                  <SelectItem value="custom">Custom Range</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {exportRange === 'custom' && (
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Start Date</label>
-                  <Input
-                    type="date"
-                    value={customStartDate}
-                    onChange={(e) => setCustomStartDate(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">End Date</label>
-                  <Input
-                    type="date"
-                    value={customEndDate}
-                    onChange={(e) => setCustomEndDate(e.target.value)}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              onClick={handleExport}
-              disabled={isExporting}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              {isExporting ? (
-                <>
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  Exporting...
-                </>
-              ) : (
-                <>
-                  <Download className="w-4 h-4 mr-2" />
-                  Export
-                </>
-              )}
-            </Button>
-            <Button variant="outline" onClick={() => setExportModalOpen(false)}>
-              Cancel
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Slack Modal */}
       <Dialog open={isSlackDialogOpen} onOpenChange={setIsSlackDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -1585,7 +1796,6 @@ export const TodaysUpdate = () => {
                 value={addOriginalText}
                 onChange={(e) => setAddOriginalText(e.target.value)}
                 className="min-h-20 resize-none border-slate-200 focus:border-blue-500"
-                placeholder="Enter original update text..."
               />
             </div>
             <div>
@@ -1593,17 +1803,7 @@ export const TodaysUpdate = () => {
               <Textarea
                 value={addFormattedUpdate}
                 onChange={(e) => setAddFormattedUpdate(e.target.value)}
-                className="min-h-32 resize-none border-slate-200 focus:border-blue-500"
-                placeholder="Enter formatted update..."
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Date & Time</label>
-              <Input
-                type="datetime-local"
-                value={addCreatedAt}
-                onChange={(e) => setAddCreatedAt(e.target.value)}
-                className="border-slate-200 focus:border-blue-500"
+                className="min-h-20 resize-none border-slate-200 focus:border-green-500"
               />
             </div>
             <div>
@@ -1631,7 +1831,6 @@ export const TodaysUpdate = () => {
                     value={proj.taskCount}
                     onChange={e => handleProjectChange(idx, 'taskCount', Number(e.target.value), 'add')}
                     className="border-slate-200 focus:border-blue-500 w-24"
-                    min={0}
                   />
                   <Button variant="outline" size="sm" onClick={() => handleRemoveProjectRow(idx, 'add')}>-</Button>
                   {idx === addProjects.length - 1 && (
@@ -1640,6 +1839,15 @@ export const TodaysUpdate = () => {
                 </div>
               ))}
             </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Created At</label>
+              <Input
+                type="datetime-local"
+                value={addCreatedAt}
+                onChange={(e) => setAddCreatedAt(e.target.value)}
+                className="border-slate-200 focus:border-blue-500"
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button
@@ -1647,7 +1855,7 @@ export const TodaysUpdate = () => {
               disabled={isAddSaving || !addOriginalText.trim() || !addFormattedUpdate.trim() || addProjects.some(p => !p.projectName.trim())}
               className="bg-blue-600 hover:bg-blue-700"
             >
-              {isAddSaving ? "Adding..." : "Add Update"}
+              {isAddSaving ? "Saving..." : "Add"}
             </Button>
             <Button variant="outline" onClick={closeAddModal}>
               Cancel
@@ -1655,6 +1863,111 @@ export const TodaysUpdate = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Layout>
+
+      {/* Export Modal */}
+      <Dialog open={exportModalOpen} onOpenChange={setExportModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Download className="w-5 h-5" />
+              Export Daily Updates
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Export Format</label>
+              <Select value={exportFormat} onValueChange={(value: 'pdf' | 'csv') => setExportFormat(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pdf">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      PDF Document
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="csv">
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="w-4 h-4" />
+                      CSV Spreadsheet
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-2">Date Range</label>
+              <Select value={exportRange} onValueChange={(value: '7days' | '1month' | 'custom') => setExportRange(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7days">Last 7 Days</SelectItem>
+                  <SelectItem value="1month">Last 30 Days</SelectItem>
+                  <SelectItem value="custom">Custom Range</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {exportRange === 'custom' && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Start Date</label>
+                  <Input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">End Date</label>
+                  <Input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="text-sm text-gray-600">
+                <strong>Preview:</strong> {getFilteredUpdates().length} updates will be exported
+                {exportRange === 'custom' && (
+                  <div className="mt-1">
+                    From {new Date(customStartDate).toLocaleDateString()} to {new Date(customEndDate).toLocaleDateString()}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button
+              onClick={handleExport}
+              disabled={isExporting || getFilteredUpdates().length === 0}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {isExporting ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4 mr-2" />
+                  Export {exportFormat.toUpperCase()}
+                </>
+              )}
+            </Button>
+            <Button variant="outline" onClick={() => setExportModalOpen(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 };
