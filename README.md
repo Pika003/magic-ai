@@ -4,7 +4,7 @@
 
 ## 🌐 Live Project
 
-[🔗 View Live Project on Lovable](https://lovable.dev/projects/03ff7b3f-1e6e-4e70-9053-7845fbc606e1)
+[🔗 View Live Project on Lovable](https://magicaidevops.netlify.app)
 
 ---
 
