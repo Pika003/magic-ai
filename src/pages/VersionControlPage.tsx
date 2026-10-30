@@ -1,19 +1,19 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { GitBranch, Github, Gitlab, Plus, Unlink } from "lucide-react";
+import { GitBranch, Github, Gitlab, Unlink } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { api, getToken } from "@/lib/apiClient";
 import { useVersionControl } from "@/hooks/useVersionControl";
 import { RepositoryList } from "@/components/version-control/RepositoryList";
 import { ConnectionStatus } from "@/components/version-control/ConnectionStatus";
 
 const handleOAuthStart = async (provider: 'github' | 'gitlab') => {
-  const { data: { session } } = await supabase.auth.getSession();
+  const token = getToken();
 
-  if (!session) {
+  if (!token) {
     toast({
       title: "Not Authenticated",
       description: "You need to be signed in to connect your account.",
@@ -22,46 +22,22 @@ const handleOAuthStart = async (provider: 'github' | 'gitlab') => {
     return;
   }
 
-  const anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indydm9ia2NneG1lbWV4ZXJueG5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk4NzQ3OTYsImV4cCI6MjA2NTQ1MDc5Nn0.6GeVPRT-hzf5uliidVKHppOHuKrmPSFrHNK8k6hibeg";
-
-  let endpoint = '';
-  if (provider === 'github') {
-    endpoint = 'https://wrvobkcgxmemexernxne.supabase.co/functions/v1/github-oauth/start';
-  } else {
-    endpoint = 'https://wrvobkcgxmemexernxne.supabase.co/functions/v1/gitlab-oauth/start';
-  }
-
   try {
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`,
-        'apikey': anonKey,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        supabaseToken: session.access_token,
-      })
-    });
-    const data = await res.json();
+    const data = await api.get<{ url: string }>(`/${provider}/start`);
 
     if (data.url) {
       window.location.href = data.url;
     } else {
-      let description = "Failed to get OAuth URL. Please try again.";
-      if (data.error) {
-        description = data.path ? `${data.error} (Path: ${data.path})` : data.error;
-      }
       toast({
         title: "OAuth Error",
-        description: description,
+        description: "Failed to get OAuth URL. Please try again.",
         variant: "destructive"
       });
     }
-  } catch (error) {
+  } catch (error: any) {
     toast({
       title: "Connection Error",
-      description: "Error connecting to OAuth service.",
+      description: error.message || "Error connecting to OAuth service.",
       variant: "destructive"
     });
   }

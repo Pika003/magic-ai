@@ -1,6 +1,5 @@
-import { supabase } from "@/integrations/supabase/client";
+﻿import { api } from "@/lib/apiClient";
 
-// Strict types for the real GitHub API objects you showed
 export interface GitHubRepositoryOwner {
   login: string;
   avatar_url: string;
@@ -52,145 +51,30 @@ export interface GitLabProject {
   [key: string]: any;
 }
 
-const handleTokenExpiration = async (provider: 'github' | 'gitlab') => {
-  console.log(`Token expired for ${provider}, deleting token record`);
-  
-  // Delete the token record entirely from database
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session) {
-    const tableName = provider === 'github' ? 'user_github_tokens' : 'user_gitlab_tokens';
-    await supabase
-      .from(tableName)
-      .delete()
-      .eq('user_id', session.user.id);
-  }
-};
-
 export const fetchGitHubRepositories = async (): Promise<GitHubRepository[]> => {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return [];
-    
-    const response = await supabase.functions.invoke('github-data', {
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: { kind: 'repos' }
-    });
-
-    // Check for function call errors first
-    if (response.error) {
-      console.error("GitHub function error:", response.error);
-      await handleTokenExpiration('github');
-      return [];
-    }
-
-    // Check for token expiration in the response data
-    if (response.data && typeof response.data === 'string' && response.data.includes('expired')) {
-      console.error("GitHub token expired:", response.data);
-      await handleTokenExpiration('github');
-      return [];
-    }
-
-    let repos: GitHubRepository[] = [];
-    // If response is a string (JSON array), parse it
-    if (typeof response.data === 'string') {
-      repos = JSON.parse(response.data);
-    } else if (Array.isArray(response.data)) {
-      repos = response.data;
-    } else {
-      console.error("GitHub API error or non-array data:", response);
-      // Check if it's a token expiration error in the response data
-      if (response.data && typeof response.data === 'object' && 
-          (response.data.error_description?.includes('expired') || response.data.error?.includes('expired'))) {
-        await handleTokenExpiration('github');
-      }
-      return [];
-    }
-    return repos;
+    const data = await api.get<GitHubRepository[]>('/github/repos');
+    return Array.isArray(data) ? data : [];
   } catch (error) {
     console.error("Error fetching GitHub repositories:", error);
-    // Check if it's a token expiration error
-    if (error && typeof error === 'object' && 
-        (error.message?.includes('expired') || error.toString().includes('expired'))) {
-      await handleTokenExpiration('github');
-    }
     return [];
   }
 };
 
 export const fetchGitLabProjects = async (): Promise<GitLabProject[]> => {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return [];
-    
-    const response = await supabase.functions.invoke('gitlab-data', {
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: { kind: 'projects' }
-    });
-
-    // Check for function call errors first
-    if (response.error) {
-      console.error("GitLab function error:", response.error);
-      await handleTokenExpiration('gitlab');
-      return [];
-    }
-
-    // Check for token expiration in the response data
-    if (response.data && typeof response.data === 'string' && response.data.includes('expired')) {
-      console.error("GitLab token expired:", response.data);
-      await handleTokenExpiration('gitlab');
-      return [];
-    }
-
-    let projects: GitLabProject[] = [];
-    // If response is a string (JSON array), parse it
-    if (typeof response.data === 'string') {
-      projects = JSON.parse(response.data);
-    } else if (Array.isArray(response.data)) {
-      projects = response.data;
-    } else {
-      console.error("GitLab API error or non-array data:", response);
-      // Check if it's a token expiration error in the response data
-      if (response.data && typeof response.data === 'object' && 
-          (response.data.error_description?.includes('expired') || response.data.error?.includes('expired'))) {
-        await handleTokenExpiration('gitlab');
-      }
-      return [];
-    }
-    return projects;
+    const data = await api.get<GitLabProject[]>('/gitlab/projects');
+    return Array.isArray(data) ? data : [];
   } catch (error) {
     console.error("Error fetching GitLab projects:", error);
-    // Check if it's a token expiration error
-    if (error && typeof error === 'object' && 
-        (error.message?.includes('expired') || error.toString().includes('expired'))) {
-      await handleTokenExpiration('gitlab');
-    }
     return [];
   }
 };
 
 export const checkConnectionStatus = async (provider: 'github' | 'gitlab'): Promise<boolean> => {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return false;
-    
-    const tableName = provider === 'github' ? 'user_github_tokens' : 'user_gitlab_tokens';
-    const { data, error } = await supabase
-      .from(tableName)
-      .select('connected, access_token')
-      .eq('user_id', session.user.id)
-      .maybeSingle(); // Use maybeSingle instead of single to handle no rows
-    
-    if (error) {
-      console.error(`Error checking ${provider} connection:`, error);
-      return false;
-    }
-    
-    // Return true only if we have data, connected is true, and access_token exists
-    return !!(data && data.connected && data.access_token);
+    const data = await api.get<{ connected: boolean }>(`/${provider}/status`);
+    return !!data.connected;
   } catch (error) {
     console.error(`Error checking ${provider} connection:`, error);
     return false;
@@ -199,21 +83,7 @@ export const checkConnectionStatus = async (provider: 'github' | 'gitlab'): Prom
 
 export const disconnectProvider = async (provider: 'github' | 'gitlab'): Promise<void> => {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-
-    const tableName = provider === 'github' ? 'user_github_tokens' : 'user_gitlab_tokens';
-    
-    // Delete the entire row instead of updating it
-    const { error } = await supabase
-      .from(tableName)
-      .delete()
-      .eq('user_id', session.user.id);
-    
-    if (error) {
-      console.error(`Error disconnecting ${provider}:`, error);
-      throw error;
-    }
+    await api.post(`/${provider}/disconnect`);
   } catch (error) {
     console.error(`Error disconnecting ${provider}:`, error);
     throw error;

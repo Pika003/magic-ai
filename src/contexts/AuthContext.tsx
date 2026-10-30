@@ -1,90 +1,135 @@
+﻿import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { api, setToken, clearToken, getToken } from '@/lib/apiClient';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+// ─── User type (replaces Supabase User) ──────────────────────────────────────
+export interface AppUser {
+  id: string;
+  email: string;
+  fullName?: string | null;
+  username?: string | null;
+  avatarUrl?: string | null;
+  paidUser?: boolean;
+}
 
+// ─── Context shape ────────────────────────────────────────────────────────────
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: AppUser | null;
   loading: boolean;
-  signUp: (email: string, password: string, fullName?: string, username?: string) => Promise<{ error: any }>;
+  signUp: (
+    email: string,
+    password: string,
+    fullName?: string,
+    username?: string
+  ) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
 };
 
+// ─── Provider ─────────────────────────────────────────────────────────────────
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-      }
-    );
-
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+  /** Fetch the current user from /api/auth/me using the stored JWT */
+  const loadUser = useCallback(async () => {
+    const token = getToken();
+    if (!token) {
+      setUser(null);
       setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+      return;
+    }
+    try {
+      const data = await api.get<AppUser>('/auth/me');
+      setUser(data);
+    } catch {
+      // Token invalid / expired
+      clearToken();
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const signUp = async (email: string, password: string, fullName?: string, username?: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          full_name: fullName,
-          username: username
-        }
-      }
-    });
-    return { error };
+  // On mount: hydrate user from stored JWT
+  useEffect(() => {
+    loadUser();
+
+    // Listen for token expiry events fired by apiClient
+    const handleExpired = () => {
+      setUser(null);
+    };
+    window.addEventListener('magic_ai_auth_expired', handleExpired);
+    return () => window.removeEventListener('magic_ai_auth_expired', handleExpired);
+  }, [loadUser]);
+
+  // ─── signUp ────────────────────────────────────────────────────────────────
+  const signUp = async (
+    email: string,
+    password: string,
+    fullName?: string,
+    username?: string
+  ): Promise<{ error: any }> => {
+    try {
+      const data = await api.post<{ token: string; user: AppUser }>('/auth/register', {
+        email,
+        password,
+        fullName,
+        username,
+      });
+      setToken(data.token);
+      setUser(data.user);
+      return { error: null };
+    } catch (err: any) {
+      return { error: { message: err.message || 'Registration failed' } };
+    }
   };
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-    return { error };
+  // ─── signIn ────────────────────────────────────────────────────────────────
+  const signIn = async (
+    email: string,
+    password: string
+  ): Promise<{ error: any }> => {
+    try {
+      const data = await api.post<{ token: string; user: AppUser }>('/auth/login', {
+        email,
+        password,
+      });
+      setToken(data.token);
+      setUser(data.user);
+      return { error: null };
+    } catch (err: any) {
+      return { error: { message: err.message || 'Login failed' } };
+    }
   };
 
+  // ─── signOut ───────────────────────────────────────────────────────────────
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      // ignore server errors on logout
+    } finally {
+      clearToken();
+      setUser(null);
+    }
   };
+
+  // ─── refreshUser ───────────────────────────────────────────────────────────
+  const refreshUser = useCallback(async () => {
+    await loadUser();
+  }, [loadUser]);
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      session,
-      loading,
-      signUp,
-      signIn,
-      signOut
-    }}>
+    <AuthContext.Provider value={{ user, loading, signUp, signIn, signOut, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

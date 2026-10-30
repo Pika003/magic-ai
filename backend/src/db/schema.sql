@@ -157,6 +157,17 @@ CREATE TABLE IF NOT EXISTS public.user_calendar_events (
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- ─── Daily Updates ───────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.daily_updates (
+  id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id          UUID        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  original_text    TEXT        NOT NULL DEFAULT '',
+  formatted_update TEXT        NOT NULL DEFAULT '',
+  projects         JSONB       NOT NULL DEFAULT '[]'::jsonb,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- ============================================================
 --  PostgreSQL Functions
 -- ============================================================

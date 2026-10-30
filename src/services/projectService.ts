@@ -1,17 +1,9 @@
-
-import { supabase } from '@/integrations/supabase/client';
+﻿import { api } from '@/lib/apiClient';
 import type { Project, CreateProjectData, UpdateProjectData } from '@/types/project';
 
-export const getProjects = async (userId: string): Promise<Project[]> => {
+export const getProjects = async (): Promise<Project[]> => {
   try {
-    const { data, error } = await supabase
-      .from('projects')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    return (data || []) as Project[];
+    return await api.get<Project[]>('/projects');
   } catch (error) {
     console.error('Error fetching projects:', error);
     return [];
@@ -19,21 +11,19 @@ export const getProjects = async (userId: string): Promise<Project[]> => {
 };
 
 export const createProject = async (
-  userId: string, 
+  _userId: string, // kept for backwards compat with call-sites; ignored — server uses JWT
   projectData: CreateProjectData
 ): Promise<{ success: boolean; error?: string; data?: Project }> => {
   try {
-    const { data, error } = await supabase
-      .from('projects')
-      .insert({
-        user_id: userId,
-        ...projectData
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return { success: true, data: data as Project };
+    const data = await api.post<Project>('/projects', {
+      name: projectData.name,
+      description: projectData.description,
+      status: projectData.status,
+      clientName: projectData.client_name,
+      clientEmail: projectData.client_email,
+      updateFrequencyDays: projectData.update_frequency_days,
+    });
+    return { success: true, data };
   } catch (error: any) {
     console.error('Error creating project:', error);
     return { success: false, error: error.message };
@@ -45,32 +35,27 @@ export const updateProject = async (
   updates: UpdateProjectData
 ): Promise<{ success: boolean; error?: string; data?: Project }> => {
   try {
-    const { data, error } = await supabase
-      .from('projects')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', projectId)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return { success: true, data: data as Project };
+    const data = await api.patch<Project>(`/projects/${projectId}`, {
+      name: updates.name,
+      description: updates.description,
+      status: updates.status,
+      clientName: updates.client_name,
+      clientEmail: updates.client_email,
+      updateFrequencyDays: updates.update_frequency_days,
+      lastUpdateSent: updates.last_update_sent,
+    });
+    return { success: true, data };
   } catch (error: any) {
     console.error('Error updating project:', error);
     return { success: false, error: error.message };
   }
 };
 
-export const deleteProject = async (projectId: string): Promise<{ success: boolean; error?: string }> => {
+export const deleteProject = async (
+  projectId: string
+): Promise<{ success: boolean; error?: string }> => {
   try {
-    const { error } = await supabase
-      .from('projects')
-      .delete()
-      .eq('id', projectId);
-
-    if (error) throw error;
+    await api.delete(`/projects/${projectId}`);
     return { success: true };
   } catch (error: any) {
     console.error('Error deleting project:', error);

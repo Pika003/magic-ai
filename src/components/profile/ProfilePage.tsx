@@ -1,27 +1,27 @@
-
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/apiClient';
 import { toast } from '@/hooks/use-toast';
 import { User, Save } from 'lucide-react';
 import { Navigation } from '@/components/Navigation';
 import { GoogleCalendarIntegration } from '@/components/GoogleCalendarIntegration';
 import { UsageStatsCard } from './UsageStatsCard';
 
-interface Profile {
+interface ProfileData {
   id: string;
-  full_name: string | null;
+  email: string;
+  fullName: string | null;
   username: string | null;
-  avatar_url: string | null;
+  paidUser: boolean;
+  avatarUrl: string | null;
 }
 
 export const ProfilePage = () => {
-  const { user } = useAuth();
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const { user, refreshUser } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isPaidUser, setIsPaidUser] = useState(false);
@@ -33,85 +33,43 @@ export const ProfilePage = () => {
   useEffect(() => {
     if (user) {
       fetchProfile();
-      fetchPaidStatus();
     }
   }, [user]);
 
   const fetchProfile = async () => {
-    if (!user) return;
-
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching profile:', error);
-        return;
-      }
-
+      const data = await api.get<ProfileData>('/profile');
       if (data) {
-        setProfile(data);
-        setFullName(data.full_name || '');
+        setFullName(data.fullName || '');
         setUsername(data.username || '');
+        setIsPaidUser(!!data.paidUser);
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error fetching profile:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchPaidStatus = async () => {
-    if (!user) return;
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('paid_user')
-        .eq('id', user.id)
-        .maybeSingle();
-      if (!error && data) {
-        setIsPaidUser(!!data.paid_user);
-      }
-    } catch (e) {
-      // ignore
-    }
-  };
-
   const updateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
-
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .upsert({
-          id: user.id,
-          full_name: fullName,
-          username: username,
-          updated_at: new Date().toISOString()
-        });
+      await api.patch('/profile', {
+        fullName,
+        username,
+      });
 
-      if (error) {
-        toast({
-          title: "Error",
-          description: error.message,
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "Success",
-          description: "Profile updated successfully!"
-        });
-        fetchProfile();
-      }
-    } catch (error) {
+      toast({
+        title: "Success",
+        description: "Profile updated successfully!"
+      });
+      fetchProfile();
+      refreshUser();
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to update profile",
+        description: error.message || "Failed to update profile",
         variant: "destructive"
       });
     } finally {

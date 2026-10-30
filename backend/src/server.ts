@@ -16,6 +16,9 @@ import gitlabRouter from './routes/gitlab';
 import paymentRouter from './routes/payment';
 import usageRouter from './routes/usage';
 import templatesRouter from './routes/templates';
+import dailyUpdatesRouter from './routes/dailyUpdates';
+import googleRouter from './routes/google';
+import gitActionsRouter from './routes/gitActions';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -73,6 +76,9 @@ app.use('/api/gitlab', gitlabRouter);
 app.use('/api/payment', paymentRouter);
 app.use('/api/usage', usageRouter);
 app.use('/api/templates', templatesRouter);
+app.use('/api/daily-updates', dailyUpdatesRouter);
+app.use('/api/google', googleRouter);
+app.use('/api/git-actions', gitActionsRouter);
 
 // ─── 404 fallback ─────────────────────────────────────────────────────────────
 app.use((_req, res) => {

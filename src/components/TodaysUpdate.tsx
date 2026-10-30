@@ -72,13 +72,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/apiClient";
 import CalendarView from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import { Input } from "@/components/ui/input";
 import { getProjects } from "@/services/projectService";
 
-import openmojiFont from "./openmojiBase64";
 
 interface ProjectEntry {
   projectName: string;
@@ -176,16 +175,11 @@ export const TodaysUpdate = () => {
   }, {} as Record<string, DailyUpdate[]>);
 
   const fetchDailyUpdates = async () => {
-    const { data, error } = await (supabase as any)
-      .from("daily_updates")
-      .select()
-      .eq("userId", user?.id)
-      .order("created_at", { ascending: false });
-
-    if (error) {
+    try {
+      const data = await api.get<DailyUpdate[]>('/daily-updates');
+      setDailyUpdates(Array.isArray(data) ? data : []);
+    } catch (error) {
       console.error("Failed to fetch daily updates", error);
-    } else {
-      setDailyUpdates((data || []) as DailyUpdate[]);
     }
   };
 
@@ -317,25 +311,22 @@ export const TodaysUpdate = () => {
       originalText: inputText,
       formattedUpdate: formattedUpdate,
       created_at: new Date().toISOString(),
-      userId: user.id,
       projects,
     };
-    const { data, error } = await (supabase as any)
-      .from("daily_updates")
-      .insert(newUpdate);
-    if (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
+    try {
+      await api.post('/daily-updates', newUpdate);
       setInputText("");
       setFormattedUpdate("");
       await fetchDailyUpdates();
       toast({
         title: "Daily Update Saved!",
         description: "Your daily update has been saved.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save daily update",
+        variant: "destructive",
       });
     }
   };
@@ -439,24 +430,25 @@ export const TodaysUpdate = () => {
   const handleEditSave = async () => {
     if (!updateBeingEdited) return;
     setIsEditSaving(true);
-    const { error } = await (supabase as any)
-      .from("daily_updates")
-      .update({ formattedUpdate: editText, projects: editProjects })
-      .eq("id", updateBeingEdited.id);
-    setIsEditSaving(false);
-    if (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
+    try {
+      await api.patch(`/daily-updates/${updateBeingEdited.id}`, {
+        formattedUpdate: editText,
+        projects: editProjects,
       });
-    } else {
       toast({
         title: "Update Edited!",
         description: "Your daily update has been updated.",
       });
       closeEditModal();
       fetchDailyUpdates();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update daily update",
+        variant: "destructive",
+      });
+    } finally {
+      setIsEditSaving(false);
     }
   };
 
@@ -472,24 +464,22 @@ export const TodaysUpdate = () => {
   const handleDelete = async () => {
     if (!updateBeingDeleted) return;
     setIsDeleteProcessing(true);
-    const { error } = await (supabase as any)
-      .from("daily_updates")
-      .delete()
-      .eq("id", updateBeingDeleted.id);
-    setIsDeleteProcessing(false);
-    if (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
+    try {
+      await api.delete(`/daily-updates/${updateBeingDeleted.id}`);
       toast({
         title: "Update Deleted!",
         description: "Your daily update has been deleted.",
       });
       closeDeleteModal();
       fetchDailyUpdates();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete daily update",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleteProcessing(false);
     }
   };
 
@@ -521,26 +511,24 @@ export const TodaysUpdate = () => {
       originalText: addOriginalText,
       formattedUpdate: addFormattedUpdate,
       created_at: new Date(addCreatedAt).toISOString(),
-      userId: user.id,
       projects: addProjects,
     };
-    const { error } = await (supabase as any)
-      .from("daily_updates")
-      .insert(newUpdate);
-    setIsAddSaving(false);
-    if (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
+    try {
+      await api.post('/daily-updates', newUpdate);
       toast({
         title: "Daily Update Added!",
         description: "Your daily update has been added.",
       });
       closeAddModal();
       fetchDailyUpdates();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add daily update",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAddSaving(false);
     }
   };
 

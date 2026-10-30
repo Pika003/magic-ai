@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, CreditCard } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/apiClient';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { usePaidStatus } from '@/contexts/PaidStatusContext';
@@ -57,19 +57,15 @@ export const PaymentPage = () => {
     if (!user) return;
     setLoading(true);
     try {
-      // Call the payment function for a one-time lifetime unlock
-      const { data, error } = await supabase.functions.invoke('create-stripe-checkout', {
-        body: {
-          plan_name: PLAN.name,
-          amount: PLAN.price * 100, // cents
-          currency: PLAN.currency.toLowerCase()
-        }
+      const data = await api.post<{ url?: string }>('/payment/stripe/checkout', {
+        planName: PLAN.name,
+        amount: PLAN.price * 100, // cents
+        currency: PLAN.currency.toLowerCase()
       });
 
-      if (error) throw error;
       if (data?.url) {
         window.open(data.url, '_blank');
-        setTimeout(refreshPaidStatus, 6000); // Try refreshing paid status 6s after opening Stripe.
+        setTimeout(refreshPaidStatus, 6000);
       } else {
         toast({
           title: "Payment Error",
@@ -77,10 +73,10 @@ export const PaymentPage = () => {
           variant: "destructive"
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Payment Error",
-        description: "Failed to initialize Stripe payment.",
+        description: error.message || "Failed to initialize Stripe payment.",
         variant: "destructive"
       });
     } finally {

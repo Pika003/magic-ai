@@ -9,7 +9,7 @@ import { Users, Send, MessageSquare, RefreshCw, Copy, ExternalLink, Mail } from 
 import { toast } from '@/hooks/use-toast';
 import { generateClientUpdateWithAI } from '@/services/openaiService';
 import { Layout } from '@/components/Layout';
-import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { useUsageTracking } from '@/hooks/useUsageTracking';
 
 interface ClientUpdate {
@@ -23,6 +23,7 @@ interface ClientUpdate {
 }
 
 export const ClientUpdate = () => {
+  const { user } = useAuth();
   const [clientName, setClientName] = useState('');
   const [originalMessage, setOriginalMessage] = useState('');
   const [liveLink, setLiveLink] = useState('');
@@ -34,21 +35,10 @@ export const ClientUpdate = () => {
   const { incrementUsage, hasReachedLimit } = useUsageTracking();
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('id', user.id)
-          .maybeSingle();
-        if (data && data.full_name) {
-          setYourName(data.full_name);
-        }
-      }
-    };
-    fetchProfile();
-  }, []);
+    if (user?.fullName) {
+      setYourName(user.fullName);
+    }
+  }, [user]);
 
   const processMessage = async (isRefresh: boolean = false) => {
     if (!originalMessage.trim() || !clientName.trim()) {

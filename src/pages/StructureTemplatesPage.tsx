@@ -1,13 +1,12 @@
-
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Plus, Edit2, Trash2, Save, Copy, RefreshCw } from 'lucide-react';
+import { FileText, Plus, Trash2, Save, Copy, RefreshCw } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/apiClient';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatWithStructureTemplate } from '@/services/openaiService';
 import { useUsageTracking } from '@/hooks/useUsageTracking';
@@ -36,17 +35,8 @@ export const StructureTemplatesPage = () => {
 
   const fetchTemplates = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .from('structure_templates')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setTemplates(data || []);
+      const data = await api.get<StructureTemplate[]>('/templates');
+      setTemplates(Array.isArray(data) ? data : []);
     } catch (error) {
       toast({
         title: "Error",
@@ -69,18 +59,10 @@ export const StructureTemplatesPage = () => {
     }
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { error } = await supabase
-        .from('structure_templates')
-        .insert({
-          user_id: user.id,
-          name: newTemplateName,
-          template_content: newTemplateContent
-        });
-
-      if (error) throw error;
+      await api.post('/templates', {
+        name: newTemplateName,
+        templateContent: newTemplateContent,
+      });
 
       setNewTemplateName('');
       setNewTemplateContent('');
@@ -101,13 +83,7 @@ export const StructureTemplatesPage = () => {
 
   const deleteTemplate = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('structure_templates')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
+      await api.delete(`/templates/${id}`);
       fetchTemplates();
       toast({
         title: "Template Deleted",
@@ -162,7 +138,7 @@ export const StructureTemplatesPage = () => {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to format content. Please check your API key in Profile settings.",
+        description: "Failed to format content. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -406,3 +382,5 @@ Conclusion: [Summary and next steps]"
     </div>
   );
 };
+
+export default StructureTemplatesPage;
