@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,6 +10,25 @@ import { api } from '@/lib/apiClient';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatWithStructureTemplate } from '@/services/openaiService';
 import { useUsageTracking } from '@/hooks/useUsageTracking';
+
+const STARTER_PRESETS = [
+  {
+    name: 'Agile Daily Standup',
+    content: "Yesterday:\n- [Tasks completed]\n\nToday:\n- [Tasks planned]\n\nBlockers:\n- [Blockers or 'None']",
+  },
+  {
+    name: 'Weekly Client Digest',
+    content: "🚀 Milestones Delivered:\n- [Deliverables completed]\n\n🛠️ In Progress:\n- [Active tasks & items in QA]\n\n📅 Coming Next Week:\n- [Upcoming deliverables]",
+  },
+  {
+    name: 'Changelog / Release Notes',
+    content: "## Release Notes\n\n### 🚀 Features\n- [New features]\n\n### 🐛 Bug Fixes\n- [Resolved issues]\n\n### ⚡ Performance\n- [Polish and optimizations]",
+  },
+  {
+    name: 'Bug / Incident Post-Mortem',
+    content: "### 🚨 Incident Summary:\n[What happened]\n\n### 🔍 Root Cause:\n[Technical cause]\n\n### 🛠️ Resolution:\n[How it was fixed]\n\n### 🛡️ Preventative Action Items:\n- [ ] [Follow-up task]",
+  },
+];
 
 interface StructureTemplate {
   id: string;
@@ -181,6 +200,29 @@ export const StructureTemplatesPage = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2">
+                Quick-load Industry Preset:
+              </label>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {STARTER_PRESETS.map((preset) => (
+                  <Button
+                    key={preset.name}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs border-dashed"
+                    onClick={() => {
+                      setNewTemplateName(preset.name);
+                      setNewTemplateContent(preset.content);
+                      toast({ title: `Loaded "${preset.name}" preset` });
+                    }}
+                  >
+                    + {preset.name}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <div>
               <label className="text-sm font-medium text-slate-700 mb-2 block">
                 Template Name
               </label>
@@ -232,6 +274,29 @@ Conclusion: [Summary and next steps]"
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+            <div>
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2">
+                Quick-load Industry Preset:
+              </label>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {STARTER_PRESETS.map((preset) => (
+                  <Button
+                    key={preset.name}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs border-dashed"
+                    onClick={() => {
+                      setNewTemplateName(preset.name);
+                      setNewTemplateContent(preset.content);
+                      toast({ title: `Loaded "${preset.name}" preset` });
+                    }}
+                  >
+                    + {preset.name}
+                  </Button>
+                ))}
+              </div>
+            </div>
               <div>
                 <label className="text-sm font-medium text-slate-700 mb-2 block">
                   Select Template

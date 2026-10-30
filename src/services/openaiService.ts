@@ -1,4 +1,4 @@
-﻿import { api } from '@/lib/apiClient';
+import { api } from '@/lib/apiClient';
 
 // ─── AI Actions ───────────────────────────────────────────────────────────────
 
@@ -74,4 +74,39 @@ export const formatWithStructureTemplate = async (
     template,
   });
   return data.formattedContent;
+};
+
+export const generatePRDescriptionWithAI = async (params: {
+  title: string;
+  changes: string;
+  breakingChanges?: string;
+  testPlan?: string;
+}): Promise<string> => {
+  const data = await api.post<{ prDescription: string }>('/ai', {
+    action: 'generate_pr_description',
+    ...params,
+  });
+  return data.prDescription;
+};
+
+export const generateConventionalCommitWithAI = async (params: {
+  summary: string;
+  diff?: string;
+}): Promise<string> => {
+  const data = await api.post<{ commitMessage: string }>('/ai', {
+    action: 'generate_conventional_commit',
+    ...params,
+  });
+  return data.commitMessage;
+};
+
+export const polishDevTextWithAI = async (params: {
+  text: string;
+  audience?: string;
+}): Promise<string> => {
+  const data = await api.post<{ polishedText: string }>('/ai', {
+    action: 'polish_dev_text',
+    ...params,
+  });
+  return data.polishedText;
 };

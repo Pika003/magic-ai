@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { api } from '@/lib/apiClient';
 import { toast } from '@/hooks/use-toast';
 import { User, Save } from 'lucide-react';
 import { Navigation } from '@/components/Navigation';
-import { GoogleCalendarIntegration } from '@/components/GoogleCalendarIntegration';
+
 import { UsageStatsCard } from './UsageStatsCard';
 
 interface ProfileData {
@@ -166,10 +166,7 @@ export const ProfilePage = () => {
             <UsageStatsCard />
           </div>
 
-          {/* Google Calendar Integration */}
-          <div className="h-fit">
-            <GoogleCalendarIntegration />
-          </div>
+          
         </div>
       </div>
     </div>

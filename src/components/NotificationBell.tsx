@@ -4,7 +4,7 @@ import { Bell, X, Calendar, Briefcase } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useAuth } from '@/contexts/AuthContext';
-import { getNotifications, dismissNotification, markNotificationAsRead } from '@/services/googleCalendarService';
+import { getNotifications, dismissNotification, markNotificationAsRead } from '@/services/notificationService';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';

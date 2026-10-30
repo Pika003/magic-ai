@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Users, Calendar, Briefcase, GitBranch, FileText } from 'lucide-react';
+import { CheckCircle, Users, Calendar, Briefcase, GitBranch, FileText, GitPullRequest } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { usePaidStatus } from '@/contexts/PaidStatusContext';
 
@@ -13,9 +13,9 @@ export const Sidebar = () => {
   const sections = [
     {
       id: 'correct-sentence',
-      label: 'Correct Sentence',
-      icon: CheckCircle,
-      description: 'Instant AI correction',
+      label: 'PR & Commit Studio',
+      icon: GitPullRequest,
+      description: 'Commits, PRs & dev writing',
       path: '/correct-sentence'
     },
     {

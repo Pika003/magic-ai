@@ -90,6 +90,14 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<
     commitSummary,
     content,
     template,
+    title,
+    changes,
+    breakingChanges,
+    testPlan,
+    diff,
+    summary,
+    audience,
+    text,
   } = req.body;
 
   if (!action) {
@@ -159,6 +167,36 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<
     case 'format_with_template':
       prompt = `Format this content using the following structure template:\nTemplate:\n${template}\nContent:\n${content}`;
       fieldName = 'formattedContent';
+      break;
+
+    case 'generate_pr_description':
+      prompt = `You are an expert software engineer. Generate a comprehensive and professional GitHub/GitLab Pull Request description in Markdown based on the following:
+Title: ${title || 'Pull Request'}
+Key Changes: ${changes || summary || ''}
+Breaking Changes: ${breakingChanges || 'None'}
+Testing Notes: ${testPlan || 'Tested locally'}
+
+Format standard sections:
+## 🚀 Summary
+## 🛠️ Changes Made
+## 🧪 Testing Performed
+## ⚠️ Breaking Changes & Considerations`;
+      fieldName = 'prDescription';
+      break;
+
+    case 'generate_conventional_commit':
+      prompt = `Generate a concise Conventional Commit message following the Conventional Commits 1.0.0 specification (e.g. feat(scope): description, fix(scope): description, refactor: description).
+Summary: ${commitSummary || summary || text || ''}
+Diff/Details: ${diff || ''}
+Output ONLY the formatted commit message with an optional body if needed. Do not include markdown codeblocks or quotes.`;
+      fieldName = 'commitMessage';
+      break;
+
+    case 'polish_dev_text':
+      prompt = `Rewrite and polish the following technical communication to make it clear, concise, professional, and tailored for: ${audience || 'stakeholders and peers'}.
+Ensure technical accuracy while improving tone and readability:
+"${text || sentence || message}"`;
+      fieldName = 'polishedText';
       break;
 
     default:

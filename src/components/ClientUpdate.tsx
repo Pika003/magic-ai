@@ -1,60 +1,101 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, Send, MessageSquare, RefreshCw, Copy, ExternalLink, Mail } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Users,
+  Send,
+  MessageSquare,
+  RefreshCw,
+  Copy,
+  ExternalLink,
+  Mail,
+  Briefcase,
+  Check,
+  Calendar,
+} from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { generateClientUpdateWithAI } from '@/services/openaiService';
-import { Layout } from '@/components/Layout';
+import { getProjects, updateProject } from '@/services/projectService';
+import type { Project } from '@/types/project';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUsageTracking } from '@/hooks/useUsageTracking';
 
-interface ClientUpdate {
+interface ClientUpdateRecord {
   id: string;
+  projectName?: string;
   clientName: string;
   originalMessage: string;
   formattedUpdate: string;
   liveLink: string;
   sentAt: string;
-  status: 'draft' | 'sent';
 }
 
 export const ClientUpdate = () => {
   const { user } = useAuth();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('custom');
+
   const [clientName, setClientName] = useState('');
-  const [originalMessage, setOriginalMessage] = useState('');
+  const [recipientEmail, setRecipientEmail] = useState('');
   const [liveLink, setLiveLink] = useState('');
+  const [originalMessage, setOriginalMessage] = useState('');
+  const [tone, setTone] = useState<'friendly' | 'executive' | 'milestone'>('friendly');
   const [formattedUpdate, setFormattedUpdate] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [clientUpdates, setClientUpdates] = useState<ClientUpdate[]>([]);
+  const [clientUpdates, setClientUpdates] = useState<ClientUpdateRecord[]>([]);
   const [yourName, setYourName] = useState('Your Name');
-  const [recipientEmail, setRecipientEmail] = useState('');
+  const [copied, setCopied] = useState(false);
   const { incrementUsage, hasReachedLimit } = useUsageTracking();
 
   useEffect(() => {
     if (user?.fullName) {
       setYourName(user.fullName);
     }
+    // Load projects
+    getProjects().then((data) => setProjects(data || [])).catch(() => {});
   }, [user]);
+
+  // Handle project selection
+  const handleSelectProject = (projectId: string) => {
+    setSelectedProjectId(projectId);
+    if (projectId === 'custom') {
+      return;
+    }
+    const found = projects.find((p) => p.id === projectId);
+    if (found) {
+      if (found.client_name) setClientName(found.client_name);
+      if (found.client_email) setRecipientEmail(found.client_email);
+      if (found.live_link) setLiveLink(found.live_link);
+    }
+  };
+
+  const selectedProject = projects.find((p) => p.id === selectedProjectId);
 
   const processMessage = async (isRefresh: boolean = false) => {
     if (!originalMessage.trim() || !clientName.trim()) {
       toast({
-        title: "Error",
-        description: "Please enter client name and update message.",
-        variant: "destructive"
+        title: 'Missing information',
+        description: 'Please enter a client name and update notes.',
+        variant: 'destructive',
       });
       return;
     }
 
     if (hasReachedLimit) {
       toast({
-        title: "Usage Limit Reached",
-        description: "You've reached your usage limit. Please upgrade to continue.",
-        variant: "destructive"
+        title: 'Usage limit reached',
+        description: "You've reached your free usage limit. Please upgrade for unlimited access.",
+        variant: 'destructive',
       });
       return;
     }
@@ -62,298 +103,355 @@ export const ClientUpdate = () => {
     setIsProcessing(true);
 
     try {
-      // Track usage before making API call
-      const usageSuccess = await incrementUsage('client_update_generation');
-      if (!usageSuccess) {
-        return; // Usage tracking will show the appropriate error
-      }
+      const usageSuccess = await incrementUsage('generate_client_update');
+      if (!usageSuccess) return;
 
-      const formatted = await generateClientUpdateWithAI(originalMessage, clientName, liveLink, yourName, isRefresh);
-      setFormattedUpdate(formatted);
+      const contextualMessage = `[Tone: ${tone}]\n${originalMessage}`;
+      const generated = await generateClientUpdateWithAI(
+        contextualMessage,
+        clientName,
+        liveLink,
+        yourName,
+        isRefresh
+      );
 
+      setFormattedUpdate(generated);
       toast({
-        title: "Client Update Generated!",
-        description: isRefresh ? "Generated a new variation of your client update." : "Your client update has been corrected and formatted using AI.",
+        title: isRefresh ? 'Update Refreshed' : 'Client Update Generated',
+        description: 'Review your update and dispatch or copy it below.',
       });
-    } catch (error) {
+    } catch (error: any) {
       toast({
-        title: "Error",
-        description: "Failed to generate client update. Please check your API key in Profile settings.",
-        variant: "destructive"
+        title: 'Generation Failed',
+        description: error.message || 'Failed to generate client update.',
+        variant: 'destructive',
       });
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleRefresh = () => {
-    processMessage(true);
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    toast({
+      title: 'Copied!',
+      description: 'Update copied to clipboard.',
+    });
+    setTimeout(() => setCopied(false), 2000);
   };
 
-  const sendUpdate = () => {
-    const newUpdate: ClientUpdate = {
+  const saveAndRecordSent = async () => {
+    if (!formattedUpdate) return;
+
+    // Record in local history
+    const record: ClientUpdateRecord = {
       id: Date.now().toString(),
+      projectName: selectedProject?.name,
       clientName,
       originalMessage,
       formattedUpdate,
       liveLink,
-      sentAt: new Date().toLocaleString(),
-      status: 'sent'
+      sentAt: new Date().toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
     };
 
-    setClientUpdates([newUpdate, ...clientUpdates]);
-    setClientName('');
-    setOriginalMessage('');
-    setLiveLink('');
-    setFormattedUpdate('');
+    setClientUpdates([record, ...clientUpdates]);
 
-    toast({
-      title: "Client Update Sent!",
-      description: "Your client update has been sent.",
-    });
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast({
-      title: "Copied!",
-      description: "Update copied to clipboard.",
-    });
+    // If attached to a project in DB, update last_update_sent timestamp
+    if (selectedProjectId && selectedProjectId !== 'custom') {
+      try {
+        await updateProject(selectedProjectId, {
+          last_update_sent: new Date().toISOString(),
+        });
+        toast({
+          title: 'Project Status Updated',
+          description: `Recorded update for project: ${selectedProject?.name}`,
+        });
+      } catch (err) {
+        console.error('Failed to update project timestamp:', err);
+      }
+    } else {
+      toast({
+        title: 'Update Saved',
+        description: 'Saved to recent updates history.',
+      });
+    }
   };
 
   const getMailToLink = () => {
     if (!formattedUpdate) return '#';
-    const subject = encodeURIComponent(`Client Update for ${clientName || "Project"}`);
+    const subject = encodeURIComponent(
+      `Project Progress Update: ${selectedProject?.name || clientName}`
+    );
     const body = encodeURIComponent(formattedUpdate);
     const to = recipientEmail ? encodeURIComponent(recipientEmail) : '';
     return `mailto:${to}?subject=${subject}&body=${body}`;
   };
 
   return (
-    <div className="w-full px-2 md:px-4 pt-10">
-      <div className="max-w-7xl mx-auto">
-        {/* Header Section */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-slate-800 mb-2">Client Update</h1>
-          <p className="text-slate-600">Create professional client updates with automatic AI correction and formatting</p>
+    <div className="max-w-6xl mx-auto p-6 space-y-6">
+      {/* Header Section */}
+      <div>
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-green-500/10 text-green-600 rounded-xl">
+            <Users className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Client Update Hub</h1>
+            <p className="text-sm text-slate-500">
+              Draft polished, milestone-driven communications for clients and link updates directly to your projects.
+            </p>
+          </div>
         </div>
+      </div>
 
-        {/* Main Input/Output Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Input Card */}
-          <Card className="border-slate-200">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <MessageSquare className="w-5 h-5 text-blue-500" />
-                <span>Client Information & Updates</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+      {/* Main Form & Output Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left: Input Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Briefcase className="w-5 h-5 text-blue-600" />
+                Project & Client Details
+              </span>
+              {selectedProject?.last_update_sent && (
+                <Badge variant="outline" className="text-xs font-normal">
+                  <Calendar className="w-3 h-3 mr-1" />
+                  Last sent: {new Date(selectedProject.last_update_sent).toLocaleDateString()}
+                </Badge>
+              )}
+            </CardTitle>
+            <CardDescription>
+              Select an existing project or enter client details manually.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Project Picker */}
+            {projects.length > 0 && (
               <div>
-                <label className="text-sm font-medium text-slate-700 mb-2 block">
-                  Client Name
+                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider block mb-1">
+                  Link to Project (Optional)
+                </label>
+                <Select value={selectedProjectId} onValueChange={handleSelectProject}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a project..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="custom">-- Custom / One-off Client --</SelectItem>
+                    {projects.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name} {p.client_name ? `(${p.client_name})` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider block mb-1">
+                  Client Name *
                 </label>
                 <Input
-                  placeholder="Enter client name"
+                  placeholder="e.g. Acme Corp / Sarah"
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
-                  className="border-slate-200 focus:border-blue-500"
                 />
               </div>
-
               <div>
-                <label className="text-sm font-medium text-slate-700 mb-2 block">
-                  Live Link (Optional)
+                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider block mb-1">
+                  Client Email (Optional)
                 </label>
                 <Input
-                  placeholder="https://your-project-link.com"
-                  value={liveLink}
-                  onChange={(e) => setLiveLink(e.target.value)}
-                  className="border-slate-200 focus:border-blue-500"
+                  type="email"
+                  placeholder="client@company.com"
+                  value={recipientEmail}
+                  onChange={(e) => setRecipientEmail(e.target.value)}
                 />
               </div>
+            </div>
 
-              <div>
-                <label className="text-sm font-medium text-slate-700 mb-2 block">
-                  Update Message
-                </label>
-                <Textarea
-                  placeholder="We completed the database setup. We fixed the login issue. We added new features for the client."
-                  value={originalMessage}
-                  onChange={(e) => setOriginalMessage(e.target.value)}
-                  className="min-h-32 resize-none border-slate-200 focus:border-blue-500"
-                />
-              </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider block mb-1">
+                Live Preview / Staging URL (Optional)
+              </label>
+              <Input
+                placeholder="https://staging.yourproject.com"
+                value={liveLink}
+                onChange={(e) => setLiveLink(e.target.value)}
+              />
+            </div>
 
-              <div className="flex items-center space-x-2">
+            {/* Tone Selector */}
+            <div>
+              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider block mb-1">
+                Communication Tone
+              </label>
+              <div className="grid grid-cols-3 gap-2">
                 <Button
-                  onClick={() => processMessage(false)}
-                  disabled={isProcessing || !originalMessage.trim() || !clientName.trim() || hasReachedLimit}
-                  className="bg-blue-500 hover:bg-blue-600"
+                  type="button"
+                  size="sm"
+                  variant={tone === 'friendly' ? 'default' : 'outline'}
+                  onClick={() => setTone('friendly')}
+                  className="text-xs"
                 >
-                  {isProcessing ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <Users className="w-4 h-4 mr-2" />
-                      Generate with AI
-                    </>
-                  )}
+                  Friendly
                 </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={tone === 'executive' ? 'default' : 'outline'}
+                  onClick={() => setTone('executive')}
+                  className="text-xs"
+                >
+                  Executive
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={tone === 'milestone' ? 'default' : 'outline'}
+                  onClick={() => setTone('milestone')}
+                  className="text-xs"
+                >
+                  Milestone
+                </Button>
+              </div>
+            </div>
+
+            {/* Rough Notes */}
+            <div>
+              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider block mb-1">
+                Progress Notes & Changes *
+              </label>
+              <Textarea
+                placeholder="e.g. Wrapped up checkout flow, resolved login cookie bug, staging environment updated for QA."
+                value={originalMessage}
+                onChange={(e) => setOriginalMessage(e.target.value)}
+                className="min-h-[110px]"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <Button
+                onClick={() => processMessage(false)}
+                disabled={isProcessing || !originalMessage.trim() || !clientName.trim()}
+                className="flex-1 bg-green-600 hover:bg-green-700"
+              >
+                {isProcessing ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Generating Update...
+                  </>
+                ) : (
+                  <>
+                    <Users className="w-4 h-4 mr-2" />
+                    Draft Client Update
+                  </>
+                )}
+              </Button>
+              {formattedUpdate && (
                 <Button
                   variant="outline"
-                  onClick={handleRefresh}
-                  disabled={isProcessing || !originalMessage.trim() || !clientName.trim() || hasReachedLimit}
+                  onClick={() => processMessage(true)}
+                  disabled={isProcessing}
                 >
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Refresh
+                  <RefreshCw className="w-4 h-4" />
                 </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Output Card */}
-          <Card className="border-slate-200">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Users className="w-5 h-5 text-green-500" />
-                <span>AI Generated Client Update</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="min-h-32 p-4 bg-green-50 border border-green-200 rounded-lg mb-4">
-                {formattedUpdate ? (
-                  <div className="text-slate-800 whitespace-pre-wrap">{formattedUpdate}</div>
-                ) : (
-                  <p className="text-slate-400 italic">AI generated client update will appear here...</p>
-                )}
-              </div>
-
-              {formattedUpdate && (
-                <div className="space-y-3">
-                  <div className="flex space-x-2">
-                    <Button
-                      onClick={sendUpdate}
-                      className="flex-1 bg-green-500 hover:bg-green-600"
-                    >
-                      <Send className="w-4 h-4 mr-2" />
-                      Save Update
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => copyToClipboard(formattedUpdate)}
-                    >
-                      <Copy className="w-4 h-4" />
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Input
-                      type="email"
-                      placeholder="Recipient Email (optional)"
-                      value={recipientEmail}
-                      onChange={e => setRecipientEmail(e.target.value)}
-                      className="flex-1 border-slate-200 focus:border-blue-500"
-                    />
-                    <a
-                      href={getMailToLink()}
-                      onClick={e => {
-                        if (!formattedUpdate) {
-                          e.preventDefault();
-                          toast({
-                            title: "Error",
-                            description: "No client update to send.",
-                            variant: "destructive"
-                          });
-                        }
-                      }}
-                      className="flex-none"
-                    >
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="text-blue-600"
-                      >
-                        <Mail className="w-4 h-4" />
-                        Email Send
-                      </Button>
-                    </a>
-                  </div>
-                </div>
               )}
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* History Section */}
-        <Card className="border-slate-200">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Users className="w-5 h-5 text-slate-600" />
-                <span>Client Update History</span>
-              </div>
-              <Badge variant="secondary">
-                {clientUpdates.length} updates
-              </Badge>
-            </CardTitle>
+        {/* Right: Output Card */}
+        <Card className="flex flex-col">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <div>
+              <CardTitle className="text-lg">Generated Client Communication</CardTitle>
+              <CardDescription>
+                Tone: <Badge variant="secondary">{tone}</Badge>
+              </CardDescription>
+            </div>
+            {formattedUpdate && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => copyToClipboard(formattedUpdate)}
+              >
+                {copied ? <Check className="w-4 h-4 text-green-600 mr-1" /> : <Copy className="w-4 h-4 mr-1" />}
+                {copied ? 'Copied' : 'Copy'}
+              </Button>
+            )}
           </CardHeader>
-          <CardContent>
-            {clientUpdates.length === 0 ? (
-              <div className="text-center py-12">
-                <MessageSquare className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                <p className="text-slate-500">No client updates yet</p>
-                <p className="text-slate-400 text-sm mt-2">Start creating client updates to see your history here</p>
+          <CardContent className="flex-1 flex flex-col justify-between">
+            {formattedUpdate ? (
+              <div className="space-y-4 flex-1 flex flex-col justify-between">
+                <div className="p-4 bg-slate-50 border rounded-lg text-slate-800 text-sm whitespace-pre-wrap leading-relaxed">
+                  {formattedUpdate}
+                </div>
+
+                <div className="pt-2 flex flex-col sm:flex-row gap-2">
+                  <Button
+                    onClick={saveAndRecordSent}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Send className="w-4 h-4 mr-2" />
+                    Save & Record Sent
+                  </Button>
+                  <a
+                    href={getMailToLink()}
+                    className="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+                  >
+                    <Mail className="w-4 h-4 mr-2" />
+                    Send via Email App
+                  </a>
+                </div>
               </div>
             ) : (
-              <div className="space-y-4">
-                {clientUpdates.map((update) => (
-                  <div
-                    key={update.id}
-                    className="p-4 border border-slate-200 rounded-lg"
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center space-x-2">
-                        <Users className="w-4 h-4 text-slate-500" />
-                        <span className="font-medium text-slate-800">Client: {update.clientName}</span>
-                        {update.liveLink && (
-                          <a
-                            href={update.liveLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-500 hover:text-blue-700"
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                          </a>
-                        )}
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge
-                          variant={update.status === 'sent' ? 'default' : 'secondary'}
-                          className={update.status === 'sent' ? 'bg-green-500' : ''}
-                        >
-                          {update.status === 'sent' ? 'Sent' : 'Draft'}
-                        </Badge>
-                        <span className="text-sm text-slate-500">{update.sentAt}</span>
-                      </div>
-                    </div>
-
-                    <div className="bg-green-50 p-3 rounded border border-green-200">
-                      <p className="text-sm font-medium text-green-700 mb-1">Client Update:</p>
-                      <div className="text-green-800 text-sm whitespace-pre-wrap">{update.formattedUpdate}</div>
-                    </div>
-                  </div>
-                ))}
+              <div className="flex-1 border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-6 text-slate-400 text-sm text-center">
+                <MessageSquare className="w-8 h-8 mb-2 stroke-1" />
+                Select a project, type what you worked on, and generate a client-facing update.
               </div>
             )}
           </CardContent>
         </Card>
       </div>
+
+      {/* History of Sent Updates */}
+      {clientUpdates.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Recent Updates Sent This Session</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="divide-y text-sm">
+              {clientUpdates.map((u) => (
+                <div key={u.id} className="py-3 flex items-center justify-between">
+                  <div>
+                    <span className="font-medium text-slate-800">
+                      {u.projectName ? `${u.projectName} — ` : ''}{u.clientName}
+                    </span>
+                    <span className="text-xs text-slate-400 ml-2">{u.sentAt}</span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => copyToClipboard(u.formattedUpdate)}
+                  >
+                    <Copy className="w-3.5 h-3.5 mr-1" /> Copy
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
