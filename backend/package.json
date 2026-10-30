@@ -1,0 +1,35 @@
+{
+  "name": "magic-ai-backend",
+  "version": "1.0.0",
+  "description": "Node.js + Express + PostgreSQL backend for Magic AI developer productivity app",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only --exit-child src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "db:migrate": "node -e \"const { pool } = require('./dist/db/pool'); const fs = require('fs'); pool.query(fs.readFileSync('./src/db/schema.sql', 'utf8')).then(() => { console.log('Migration done'); process.exit(0); }).catch(e => { console.error(e); process.exit(1); })\""
+  },
+  "keywords": ["nodejs", "express", "postgresql", "typescript", "rest-api"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.3"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^22.5.5",
+    "@types/pg": "^8.11.10",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.5.3"
+  }
+}
