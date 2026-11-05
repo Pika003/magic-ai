@@ -23,7 +23,7 @@ backend/                          ← New folder alongside frontend root
 │   │   ├── ai.ts                 # POST /ai (all AI actions)
 │   │   ├── github.ts             # GET /github/start, /github/callback, /github/repos
 │   │   ├── gitlab.ts             # GET /gitlab/start, /gitlab/callback, /gitlab/projects
-│   │   ├── payment.ts            # POST /payment/stripe, /payment/razorpay, /payment/verify
+│   │   ├── payment.ts            # POST /payment/razorpay/order, /payment/razorpay/verify
 │   │   ├── profile.ts            # GET/PATCH /profile
 │   │   ├── usage.ts              # GET /usage, POST /usage/increment
 │   │   └── templates.ts          # CRUD /templates
@@ -123,7 +123,6 @@ import usageRouter from './routes/usage';
 import templatesRouter from './routes/templates';
 import notificationsRouter from './routes/notifications';
 import { errorHandler } from './middleware/errorHandler';
-
 const app = express();
 const PORT = process.env.PORT || 4000;
 
@@ -253,17 +252,12 @@ Same pattern as GitHub.
 
 ### 3.4 Payment Routes (`src/routes/payment.ts`)
 
-**Replaces:** `create-razorpay-order`, `create-stripe-checkout`, `verify-razorpay-payment`, `stripe-webhook-unlock`
+**Replaces:** `create-razorpay-order`, `verify-razorpay-payment`
 
 ```typescript
-// POST /api/payment/stripe/create-checkout → create Stripe session
-// POST /api/payment/stripe/webhook → Stripe webhook handler (raw body!)
-// POST /api/payment/razorpay/create-order → create Razorpay order
-// POST /api/payment/razorpay/verify → verify signature, mark paid
+// POST /api/payment/razorpay/order → create Razorpay order
+// POST /api/payment/razorpay/verify → verify HMAC signature, mark paid
 ```
-
-> [!CAUTION]
-> Stripe webhooks require raw body (not parsed JSON). Use `express.raw({ type: 'application/json' })` on the webhook route before `express.json()` middleware.
 
 ### 3.5 Usage Routes (`src/routes/usage.ts`)
 
@@ -482,8 +476,6 @@ GITLAB_CLIENT_ID=...
 GITLAB_CLIENT_SECRET=...
 RAZORPAY_KEY_ID=...
 RAZORPAY_KEY_SECRET=...
-STRIPE_SECRET_KEY=...
-STRIPE_WEBHOOK_SECRET=...
 FRONTEND_URL=https://magicaidevops.netlify.app
 PORT=4000
 NODE_ENV=production
@@ -508,9 +500,7 @@ NODE_ENV=production
 - [ ] `POST /api/github/disconnect`
 - [ ] `GET /api/gitlab/start` + `GET /api/gitlab/callback`
 - [ ] `GET /api/gitlab/projects` + `GET /api/gitlab/project/:id`
-- [ ] `POST /api/payment/stripe/create-checkout`
-- [ ] `POST /api/payment/stripe/webhook`
-- [ ] `POST /api/payment/razorpay/create-order`
+- [ ] `POST /api/payment/razorpay/order`
 - [ ] `POST /api/payment/razorpay/verify`
 - [ ] `GET /api/projects` + `POST` + `PATCH /:id` + `DELETE /:id`
 - [ ] `GET /api/notifications` + `PATCH /:id/read` + `PATCH /:id/dismiss`

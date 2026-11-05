@@ -52,16 +52,37 @@ Project    | Task Details
   },
 ];
 
-/** Call OpenAI chat completions */
+/** Call AI — uses Groq (free) if GROQ_API_KEY is set, otherwise falls back to OpenAI */
 async function callOpenAI(messages: { role: string; content: string }[]): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error('OpenAI API key not configured');
+  const groqKey = process.env.GROQ_API_KEY;
+  const openaiKey = process.env.OPENAI_API_KEY;
 
+  if (groqKey) {
+    // Groq free tier — OpenAI-compatible API, uses openai/gpt-oss-120b
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${groqKey}`,
+      },
+      body: JSON.stringify({ model: 'openai/gpt-oss-120b', messages }),
+    });
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`Groq error: ${err}`);
+    }
+    const data: any = await response.json();
+    return data.choices?.[0]?.message?.content ?? 'No response';
+  }
+
+  if (!openaiKey) throw new Error('No AI provider configured. Set GROQ_API_KEY or OPENAI_API_KEY.');
+
+  // OpenAI fallback
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${openaiKey}`,
     },
     body: JSON.stringify({ model: 'gpt-4o-mini', messages }),
   });
@@ -98,6 +119,13 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<
     summary,
     audience,
     text,
+    // README generation
+    repoName,
+    repoDescription,
+    repoLanguage,
+    repoTopics,
+    repoVisibility,
+    recentCommits,
   } = req.body;
 
   if (!action) {
@@ -197,6 +225,34 @@ Output ONLY the formatted commit message with an optional body if needed. Do not
 Ensure technical accuracy while improving tone and readability:
 "${text || sentence || message}"`;
       fieldName = 'polishedText';
+      break;
+
+    case 'polish_dev_text':
+      prompt = `Rewrite and polish the following technical communication to make it clear, concise, professional, and tailored for: ${audience || 'stakeholders and peers'}.
+Ensure technical accuracy while improving tone and readability:
+"${text || sentence || message}"`;
+      fieldName = 'polishedText';
+      break;
+
+    case 'generate_readme':
+      prompt = `You are a professional technical writer. Generate a comprehensive, well-structured README.md file for the following repository.
+
+Repository Details:
+- Name: ${repoName || 'Unknown'}
+- Description: ${repoDescription || 'No description provided'}
+- Primary Language: ${repoLanguage || 'Not specified'}
+- Topics/Tags: ${repoTopics || 'None'}
+- Visibility: ${repoVisibility || 'Public'}
+- Recent Commits: ${recentCommits || 'No commit history available'}
+
+Requirements:
+1. Use proper Markdown formatting with headers, code blocks, and badges
+2. Include these sections: Project title with a badge row, Overview/About, Features, Tech Stack, Getting Started (Prerequisites + Installation + Usage), Project Structure (inferred from the name/language), Contributing, and License
+3. Infer reasonable content from the repo name, description, language, and commits — be specific, not generic
+4. Keep it professional, clean, and developer-friendly
+5. Use emojis sparingly for section headers
+6. Output ONLY the raw Markdown content — no explanation, no surrounding prose`;
+      fieldName = 'readmeContent';
       break;
 
     default:

@@ -6,14 +6,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 import { NotificationBell } from './NotificationBell';
-// Corrected import path to match actual file name (camelCase):
-import { useUsageTracking } from '@/hooks/useUsageTracking';
 
 export const Navigation = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { isPaidUser, hasReachedLimit } = useUsageTracking();
 
   const handleSignOut = async () => {
     try {
@@ -36,10 +33,6 @@ export const Navigation = () => {
     navigate('/profile');
   };
 
-  const goToPayment = () => {
-    navigate('/payment');
-  };
-
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200">
       <div className="container mx-auto px-4">
@@ -56,17 +49,6 @@ export const Navigation = () => {
           </div>
           
           <div className="flex items-center space-x-1">
-            {/* Show payment/upgrade button ONLY if not paid user */}
-            {user && !isPaidUser && (
-              <button
-                onClick={goToPayment}
-                className={`bg-yellow-400 hover:bg-yellow-500 text-slate-800 px-3 py-2 rounded-md font-semibold mr-2 transition ${
-                  hasReachedLimit ? 'animate-pulse shadow-lg' : ''
-                }`}
-              >
-                {hasReachedLimit ? 'Upgrade Required' : 'Go to Payment'}
-              </button>
-            )}
             {user ? (
               <>
                 <NotificationBell />

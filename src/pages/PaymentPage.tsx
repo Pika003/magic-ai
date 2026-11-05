@@ -5,13 +5,21 @@ import { CheckCircle, CreditCard } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/apiClient';
 import { toast } from '@/hooks/use-toast';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { usePaidStatus } from '@/contexts/PaidStatusContext';
+
+// Razorpay global type (loaded via CDN script)
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
 
 const PLAN = {
   name: "Lifetime Unlimited",
-  price: 5.00,
-  currency: "USD",
+  priceINR: 499,      // ₹499 one-time
+  priceDisplay: "₹499",
+  currency: "INR",
   features: [
     "Unlimited feature usage – forever",
     "One-time payment, no renewal",
@@ -19,86 +27,140 @@ const PLAN = {
   ]
 };
 
+/** Dynamically load the Razorpay checkout script once */
+function loadRazorpayScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
+
 export const PaymentPage = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [verifying, setVerifying] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
-  const { refreshPaidStatus, isPaidUser, loading: statusLoading } = usePaidStatus();
+  const { refreshPaidStatus, isPaidUser } = usePaidStatus();
 
-  // On mount: check if payment=success and refresh paid status
+  // Redirect already-paid users straight to profile
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    if (params.get("payment") === "success") {
-      setVerifying(true);
-      Promise.resolve(refreshPaidStatus()).then(() => {
-        // Small delay for freshness, avoids confusion
-        setTimeout(() => {
-          setVerifying(false);
-          if (isPaidUser) {
-            toast({
-              title: "Thank You!",
-              description: "Your payment was received. Unlimited access unlocked!",
-              variant: "default"
-            });
-            // Optionally redirect them after a second
-            setTimeout(() => {
-              navigate("/profile");
-            }, 1500);
-          }
-        }, 700);
-      });
+    if (isPaidUser) {
+      navigate('/profile');
     }
-  // Only run this check once on mount and when location changes
-  }, [location.search, refreshPaidStatus, isPaidUser, navigate]);
+  }, [isPaidUser, navigate]);
 
-  const handleStripePayment = async () => {
+  const handleRazorpayPayment = async () => {
     if (!user) return;
     setLoading(true);
-    try {
-      const data = await api.post<{ url?: string }>('/payment/stripe/checkout', {
-        planName: PLAN.name,
-        amount: PLAN.price * 100, // cents
-        currency: PLAN.currency.toLowerCase()
-      });
 
-      if (data?.url) {
-        window.open(data.url, '_blank');
-        setTimeout(refreshPaidStatus, 6000);
-      } else {
+    try {
+      // 1. Load Razorpay SDK
+      const loaded = await loadRazorpayScript();
+      if (!loaded) {
         toast({
           title: "Payment Error",
-          description: "Failed to initialize checkout.",
+          description: "Failed to load Razorpay. Please check your connection.",
           variant: "destructive"
         });
+        setLoading(false);
+        return;
       }
+
+      // 2. Create order on backend
+      const orderData = await api.post<{
+        orderId: string;
+        amount: number;
+        currency: string;
+        keyId: string;
+      }>('/payment/razorpay/order', {
+        planName: PLAN.name,
+        amount: PLAN.priceINR * 100, // paise
+        currency: PLAN.currency,
+      });
+
+      if (!orderData?.orderId) {
+        toast({
+          title: "Payment Error",
+          description: "Failed to create order. Please try again.",
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      }
+
+      // 3. Open Razorpay checkout
+      const options = {
+        key: orderData.keyId,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: "Magic AI",
+        description: PLAN.name,
+        order_id: orderData.orderId,
+        prefill: {
+          email: user.email ?? '',
+        },
+        theme: { color: "#2563EB" },
+        handler: async (response: {
+          razorpay_order_id: string;
+          razorpay_payment_id: string;
+          razorpay_signature: string;
+        }) => {
+          // 4. Verify payment signature on backend
+          try {
+            await api.post('/payment/razorpay/verify', {
+              razorpayOrderId: response.razorpay_order_id,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpaySignature: response.razorpay_signature,
+            });
+
+            await refreshPaidStatus();
+            toast({
+              title: "Thank You! 🎉",
+              description: "Payment successful. Unlimited access unlocked!",
+              variant: "default"
+            });
+            setTimeout(() => navigate('/profile'), 1500);
+          } catch (verifyErr: any) {
+            toast({
+              title: "Verification Failed",
+              description: verifyErr.message || "Payment received but verification failed. Contact support.",
+              variant: "destructive"
+            });
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setLoading(false);
+          }
+        }
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', (response: any) => {
+        toast({
+          title: "Payment Failed",
+          description: response.error?.description || "Payment failed. Please try again.",
+          variant: "destructive"
+        });
+        setLoading(false);
+      });
+      rzp.open();
+
     } catch (error: any) {
       toast({
         title: "Payment Error",
-        description: error.message || "Failed to initialize Stripe payment.",
+        description: error.message || "Failed to initialize payment.",
         variant: "destructive"
       });
-    } finally {
       setLoading(false);
     }
   };
-
-  // If payment was done, show success and redirect
-  if (verifying || (location.search.includes("payment=success") && statusLoading)) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
-        <div className="bg-white border shadow px-10 py-8 rounded flex flex-col items-center">
-          <CheckCircle className="w-8 h-8 text-green-600 mb-2" />
-          <h1 className="text-xl font-bold mb-2">Verifying your payment...</h1>
-          <p className="text-slate-500 text-center mb-2">
-            Please wait while we unlock unlimited features for your account.<br />
-            This may take a moment.
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-8">
@@ -107,40 +169,47 @@ export const PaymentPage = () => {
           <h1 className="text-4xl font-bold text-slate-800 mb-4">Upgrade for Unlimited Usage</h1>
           <p className="text-lg text-slate-600 mb-4">A one-time payment unlocks all features – forever!</p>
           <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg inline-block">
-            <p className="text-green-700">⭐ Pay just <span className="font-bold">${PLAN.price}</span> once, unlock forever. No recurring fees ever. ⭐</p>
+            <p className="text-green-700">
+              ⭐ Pay just <span className="font-bold">{PLAN.priceDisplay}</span> once, unlock forever. No recurring fees ever. ⭐
+            </p>
           </div>
         </div>
-        <Card className={`shadow-lg border-blue-500`}>
+        <Card className="shadow-lg border-blue-500">
           <CardHeader className="text-center pb-4">
             <CardTitle className="text-2xl font-bold">{PLAN.name}</CardTitle>
             <div className="text-3xl font-bold text-blue-600">
-              ${PLAN.price}
+              {PLAN.priceDisplay}
             </div>
+            <p className="text-sm text-slate-400">One-time · INR · Powered by Razorpay</p>
           </CardHeader>
           <CardContent className="space-y-6">
             <ul className="space-y-3">
               {PLAN.features.map((feature, i) => (
                 <li key={i} className="flex items-center space-x-2">
-                  <CheckCircle className="w-5 h-5 text-green-500" />
+                  <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
                   <span className="text-slate-600">{feature}</span>
                 </li>
               ))}
             </ul>
-            
+
             <Button
-              onClick={handleStripePayment}
+              onClick={handleRazorpayPayment}
               disabled={loading}
-              className="w-full bg-black hover:bg-gray-900"
+              className="w-full bg-blue-600 hover:bg-blue-700"
             >
               {loading ? (
                 "Processing..."
               ) : (
                 <>
                   <CreditCard className="w-4 h-4 mr-2" />
-                  Pay & Unlock Forever
+                  Pay {PLAN.priceDisplay} &amp; Unlock Forever
                 </>
               )}
             </Button>
+
+            <p className="text-xs text-center text-slate-400">
+              Secure payment via Razorpay · UPI, Cards, Net Banking accepted
+            </p>
           </CardContent>
         </Card>
       </div>

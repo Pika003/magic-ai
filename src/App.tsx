@@ -2,54 +2,18 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import { PaidStatusProvider } from "./contexts/PaidStatusContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import Index from "./pages/Index";
 import { AuthPage } from "./components/auth/AuthPage";
 import { ProfilePage } from "./components/profile/ProfilePage";
-import { CorrectSentence } from "./components/CorrectSentence";
-import { ClientUpdate } from "./components/ClientUpdate";
-import { TodaysUpdate } from "./components/TodaysUpdate";
-import NotFound from "./pages/NotFound";
-import { ProjectsPage } from "./pages/ProjectsPage";
 import VersionControlPage from "./pages/VersionControlPage";
-import { StructureTemplatesPage } from "./pages/StructureTemplatesPage";
-import PaymentPage from "./pages/PaymentPage";
-import { Layout } from "@/components/Layout";
-import React from "react";
-import { PaidStatusProvider, usePaidStatus } from "./contexts/PaidStatusContext";
 import RepoDetailsPage from "./pages/RepoDetailsPage";
-
-// PaidUserRoute: Now connected to PaidStatusContext and never stales
-const PaidUserRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isPaidUser, loading, refreshPaidStatus } = usePaidStatus();
-  const [checking, setChecking] = React.useState(false);
-  const location = useLocation();
-  // Immediately checks paid status after payment
-  React.useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    if (params.get("payment") === "success") {
-      setChecking(true);
-      refreshPaidStatus().then(() => setChecking(false)).catch(() => setChecking(false));
-    }
-  }, [location.search, refreshPaidStatus]);
-  if (loading || checking) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
-      </div>
-    );
-  }
-  if (!isPaidUser) {
-    const params = new URLSearchParams(location.search);
-    if (params.get("payment") !== "success") {
-      window.location.href = "/payment";
-    }
-    return null;
-  }
-  return <>{children}</>;
-};
+import ActionMarketplacePage from "./pages/ActionMarketplacePage";
+import NotFound from "./pages/NotFound";
+import { Layout } from "@/components/Layout";
 
 const queryClient = new QueryClient();
 
@@ -60,80 +24,26 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-         <PaidStatusProvider>
+          <PaidStatusProvider>
             <Routes>
+              {/* Public */}
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<AuthPage />} />
-              <Route 
-                path="/payment" 
-                element={
-                  <ProtectedRoute>
-                    <PaymentPage />
-                  </ProtectedRoute>
-                } 
-              />
-              {/* Protected pages are now always rendered WITH the Layout, so the header/sidebar show */}
-              <Route 
-                path="/correct-sentence" 
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <CorrectSentence />
-                    </Layout>
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/client-update" 
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <ClientUpdate />
-                    </Layout>
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/todays-update" 
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <TodaysUpdate />
-                    </Layout>
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/structure-templates" 
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <StructureTemplatesPage />
-                    </Layout>
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/profile" 
+
+              {/* Profile */}
+              <Route
+                path="/profile"
                 element={
                   <ProtectedRoute>
                     <Layout>
                       <ProfilePage />
                     </Layout>
                   </ProtectedRoute>
-                } 
+                }
               />
-              <Route 
-                path="/projects" 
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <ProjectsPage />
-                    </Layout>
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
+
+              {/* Version Control */}
+              <Route
                 path="/version-control"
                 element={
                   <ProtectedRoute>
@@ -141,9 +51,9 @@ const App = () => (
                       <VersionControlPage />
                     </Layout>
                   </ProtectedRoute>
-                } 
+                }
               />
-              <Route 
+              <Route
                 path="/version-control/github/:id"
                 element={
                   <ProtectedRoute>
@@ -151,9 +61,9 @@ const App = () => (
                       <RepoDetailsPage />
                     </Layout>
                   </ProtectedRoute>
-                } 
+                }
               />
-              <Route 
+              <Route
                 path="/version-control/gitlab/:id"
                 element={
                   <ProtectedRoute>
@@ -161,14 +71,28 @@ const App = () => (
                       <RepoDetailsPage />
                     </Layout>
                   </ProtectedRoute>
-                } 
+                }
               />
+
+              {/* Action Marketplace */}
+              <Route
+                path="/action-marketplace"
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <ActionMarketplacePage />
+                    </Layout>
+                  </ProtectedRoute>
+                }
+              />
+
               <Route path="*" element={<NotFound />} />
             </Routes>
-         </PaidStatusProvider>
+          </PaidStatusProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
 );
+
 export default App;

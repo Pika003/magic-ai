@@ -9,7 +9,13 @@
     "start": "node dist/server.js",
     "db:migrate": "node -e \"const { pool } = require('./dist/db/pool'); const fs = require('fs'); pool.query(fs.readFileSync('./src/db/schema.sql', 'utf8')).then(() => { console.log('Migration done'); process.exit(0); }).catch(e => { console.error(e); process.exit(1); })\""
   },
-  "keywords": ["nodejs", "express", "postgresql", "typescript", "rest-api"],
+  "keywords": [
+    "nodejs",
+    "express",
+    "postgresql",
+    "typescript",
+    "rest-api"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
@@ -30,6 +36,6 @@
     "@types/node": "^22.5.5",
     "@types/pg": "^8.11.10",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5.5.3"
+    "typescript": "^5.8.3"
   }
 }

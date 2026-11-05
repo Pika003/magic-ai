@@ -191,4 +191,257 @@ router.post('/disconnect', authenticate, async (req: AuthRequest, res: Response)
   }
 });
 
+// ─── POST /api/gitlab/workflow-commit ────────────────────────────────────────
+// Body: { projectId, filePath, content, commitMessage? }
+// Creates or updates any file (e.g. .gitlab-ci.yml) in the GitLab project.
+router.post('/workflow-commit', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { projectId, filePath, content, commitMessage } = req.body;
+  if (!projectId || !filePath || !content) {
+    res.status(400).json({ error: 'projectId, filePath, and content are required' });
+    return;
+  }
+
+  try {
+    const tokenResult = await pool.query(
+      'SELECT access_token FROM public.user_gitlab_tokens WHERE user_id = $1 AND connected = true',
+      [req.userId]
+    );
+    if (!tokenResult.rows[0]) {
+      res.status(401).json({ error: 'GitLab not connected' });
+      return;
+    }
+    const { access_token } = tokenResult.rows[0];
+    const glHeaders = {
+      Authorization: `Bearer ${access_token}`,
+      'Content-Type': 'application/json',
+    };
+    const encodedId = encodeURIComponent(String(projectId));
+    const encodedFilePath = encodeURIComponent(filePath);
+
+    // Get default branch
+    const projectResp = await fetch(`https://gitlab.com/api/v4/projects/${encodedId}`, {
+      headers: { Authorization: `Bearer ${access_token}` },
+    });
+    const projectData: any = projectResp.ok ? await projectResp.json() : {};
+    const branch = projectData.default_branch || 'main';
+
+    // Check if file already exists
+    const existingResp = await fetch(
+      `https://gitlab.com/api/v4/projects/${encodedId}/repository/files/${encodedFilePath}?ref=${branch}`,
+      { headers: { Authorization: `Bearer ${access_token}` } }
+    );
+    const fileExists = existingResp.ok;
+
+    const message = commitMessage || `ci: add ${filePath}`;
+    const body = JSON.stringify({ branch, content, commit_message: message, encoding: 'text' });
+    const method = fileExists ? 'PUT' : 'POST';
+
+    const commitResp = await fetch(
+      `https://gitlab.com/api/v4/projects/${encodedId}/repository/files/${encodedFilePath}`,
+      { method, headers: glHeaders, body }
+    );
+
+    if (!commitResp.ok) {
+      const errData: any = await commitResp.json().catch(() => ({}));
+      res.status(commitResp.status).json({ error: errData.message || 'Failed to commit file' });
+      return;
+    }
+
+    const commitData: any = await commitResp.json();
+    res.json({
+      success: true,
+      branch: commitData.branch,
+      filePath: commitData.file_path,
+      message: `${filePath} committed to project ${projectId}`,
+    });
+  } catch (err: any) {
+    console.error('[GITLAB] workflow-commit error:', err);
+    res.status(500).json({ error: err.message || 'Failed to commit file' });
+  }
+});
+
+// ─── POST /api/gitlab/readme-generate ────────────────────────────────────────
+// Body: { projectId }
+// 1. Fetches project metadata + recent commits from GitLab
+// 2. Calls AI to generate a README
+// 3. Returns the generated README content
+router.post('/readme-generate', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { projectId } = req.body;
+  if (!projectId) {
+    res.status(400).json({ error: 'projectId is required' });
+    return;
+  }
+
+  try {
+    const tokenResult = await pool.query(
+      'SELECT access_token FROM public.user_gitlab_tokens WHERE user_id = $1 AND connected = true',
+      [req.userId]
+    );
+    if (!tokenResult.rows[0]) {
+      res.status(401).json({ error: 'GitLab not connected' });
+      return;
+    }
+    const { access_token } = tokenResult.rows[0];
+    const glHeaders = { Authorization: `Bearer ${access_token}` };
+    const encodedId = encodeURIComponent(String(projectId));
+
+    // Fetch project metadata and recent commits in parallel
+    const [projectResp, commitsResp, languagesResp] = await Promise.all([
+      fetch(`https://gitlab.com/api/v4/projects/${encodedId}`, { headers: glHeaders }),
+      fetch(`https://gitlab.com/api/v4/projects/${encodedId}/repository/commits?per_page=10`, { headers: glHeaders }),
+      fetch(`https://gitlab.com/api/v4/projects/${encodedId}/languages`, { headers: glHeaders }),
+    ]);
+
+    if (!projectResp.ok) {
+      res.status(projectResp.status).json({ error: 'Failed to fetch project details from GitLab' });
+      return;
+    }
+
+    const projectData: any = await projectResp.json();
+    const commitsData: any[] = commitsResp.ok ? (await commitsResp.json()) as any[] : [];
+    const languagesData: Record<string, number> = languagesResp.ok ? (await languagesResp.json()) as Record<string, number> : {};
+
+    const recentCommits = commitsData
+      .slice(0, 10)
+      .map((c: any) => `- ${c.title || c.message?.split('\n')[0]} (${c.author_name})`)
+      .join('\n') || 'No commits yet';
+
+    const topLanguages = Object.keys(languagesData).slice(0, 5).join(', ') || 'Not specified';
+    const topics = projectData.tag_list?.join(', ') || projectData.topics?.join(', ') || 'None';
+
+    // Call AI — Groq (free) first, fall back to OpenAI
+    const apiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY;
+    const isGroq = !!process.env.GROQ_API_KEY;
+    if (!apiKey) { res.status(500).json({ error: 'No AI provider configured (GROQ_API_KEY or OPENAI_API_KEY)' }); return; }
+
+    const prompt = `You are a professional technical writer. Generate a comprehensive, well-structured README.md file for the following GitLab repository.
+
+Repository Details:
+- Name: ${projectData.path_with_namespace || projectData.name}
+- Description: ${projectData.description || 'No description provided'}
+- Primary Languages: ${topLanguages}
+- Topics/Tags: ${topics}
+- Visibility: ${projectData.visibility || 'public'}
+- Default Branch: ${projectData.default_branch || 'main'}
+- Stars: ${projectData.star_count ?? 0} | Forks: ${projectData.forks_count ?? 0}
+- Recent Commits:
+${recentCommits}
+
+Requirements:
+1. Use proper Markdown formatting with headers, code blocks, and badges
+2. Include these sections: Project title with a badge row, Overview/About, Features, Tech Stack, Getting Started (Prerequisites + Installation + Usage), Project Structure (inferred), Contributing, License
+3. Infer specific, realistic content from the project metadata and commits — avoid generic filler
+4. Keep it professional and developer-friendly
+5. Use emojis sparingly for section headers
+6. Output ONLY the raw Markdown — no surrounding explanation`;
+
+    const aiResp = await fetch(
+      isGroq ? 'https://api.groq.com/openai/v1/chat/completions' : 'https://api.openai.com/v1/chat/completions',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: isGroq ? 'openai/gpt-oss-120b' : 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: 'You are a professional technical writer specializing in open-source documentation.' },
+            { role: 'user', content: prompt },
+          ],
+        }),
+      }
+    );
+
+    if (!aiResp.ok) {
+      const errText = await aiResp.text();
+      res.status(500).json({ error: `AI error: ${errText}` });
+      return;
+    }
+
+    const aiData: any = await aiResp.json();
+    const readmeContent: string = aiData.choices?.[0]?.message?.content ?? '';
+
+    res.json({
+      readmeContent,
+      projectId: projectData.id,
+      projectPath: projectData.path_with_namespace,
+      defaultBranch: projectData.default_branch || 'main',
+    });
+  } catch (err: any) {
+    console.error('[GITLAB] readme generate error:', err);
+    res.status(500).json({ error: err.message || 'Failed to generate README' });
+  }
+});
+
+// ─── POST /api/gitlab/readme/commit ───────────────────────────────────────────
+// Body: { projectId, readmeContent, commitMessage? }
+// Creates or updates README.md via the GitLab Repository Files API.
+router.post('/readme-commit', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { projectId, readmeContent, commitMessage } = req.body;
+  if (!projectId || !readmeContent) {
+    res.status(400).json({ error: 'projectId and readmeContent are required' });
+    return;
+  }
+
+  try {
+    const tokenResult = await pool.query(
+      'SELECT access_token FROM public.user_gitlab_tokens WHERE user_id = $1 AND connected = true',
+      [req.userId]
+    );
+    if (!tokenResult.rows[0]) {
+      res.status(401).json({ error: 'GitLab not connected' });
+      return;
+    }
+    const { access_token } = tokenResult.rows[0];
+    const glHeaders = {
+      Authorization: `Bearer ${access_token}`,
+      'Content-Type': 'application/json',
+    };
+    const encodedId = encodeURIComponent(String(projectId));
+
+    // Fetch the project to get default_branch
+    const projectResp = await fetch(`https://gitlab.com/api/v4/projects/${encodedId}`, {
+      headers: { Authorization: `Bearer ${access_token}` },
+    });
+    const projectData: any = projectResp.ok ? await projectResp.json() : {};
+    const branch = projectData.default_branch || 'main';
+
+    // Check if README.md already exists
+    const existingResp = await fetch(
+      `https://gitlab.com/api/v4/projects/${encodedId}/repository/files/README.md?ref=${branch}`,
+      { headers: { Authorization: `Bearer ${access_token}` } }
+    );
+    const fileExists = existingResp.ok;
+
+    const message = commitMessage || '📝 Add AI-generated README.md';
+    const body = JSON.stringify({
+      branch,
+      content: readmeContent,
+      commit_message: message,
+      encoding: 'text',
+    });
+
+    const method = fileExists ? 'PUT' : 'POST';
+    const commitResp = await fetch(
+      `https://gitlab.com/api/v4/projects/${encodedId}/repository/files/README.md`,
+      { method, headers: glHeaders, body }
+    );
+
+    if (!commitResp.ok) {
+      const errData: any = await commitResp.json().catch(() => ({}));
+      res.status(commitResp.status).json({ error: errData.message || 'Failed to commit README' });
+      return;
+    }
+
+    const commitData: any = await commitResp.json();
+    res.json({
+      success: true,
+      branch: commitData.branch,
+      filePath: commitData.file_path,
+      message: `README.md successfully committed to ${projectData.path_with_namespace || projectId}`,
+    });
+  } catch (err: any) {
+    console.error('[GITLAB] readme commit error:', err);
+    res.status(500).json({ error: err.message || 'Failed to commit README' });
+  }
+});
+
 export default router;

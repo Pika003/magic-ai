@@ -206,4 +206,248 @@ router.post('/disconnect', authenticate, async (req: AuthRequest, res: Response)
   }
 });
 
+// ─── POST /api/github/workflow-commit ────────────────────────────────────────
+// Body: { owner, repo, filePath, content, commitMessage? }
+// Commits any text file (e.g. .github/workflows/ci.yml) to the repo.
+router.post('/workflow-commit', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { owner, repo, filePath, content, commitMessage } = req.body;
+  if (!owner || !repo || !filePath || !content) {
+    res.status(400).json({ error: 'owner, repo, filePath, and content are required' });
+    return;
+  }
+
+  try {
+    const tokenResult = await pool.query(
+      'SELECT access_token FROM public.user_github_tokens WHERE user_id = $1 AND connected = true',
+      [req.userId]
+    );
+    if (!tokenResult.rows[0]) {
+      res.status(401).json({ error: 'GitHub not connected' });
+      return;
+    }
+    const { access_token } = tokenResult.rows[0];
+    const ghHeaders = {
+      Authorization: `token ${access_token}`,
+      Accept: 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
+    };
+
+    // URL-encode the file path for the API call (e.g. .github/workflows/ci.yml)
+    const encodedPath = filePath.split('/').map(encodeURIComponent).join('/');
+
+    // Check if file already exists (need SHA for update)
+    let existingSha: string | undefined;
+    const existingResp = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/contents/${encodedPath}`,
+      { headers: ghHeaders }
+    );
+    if (existingResp.ok) {
+      const existing: any = await existingResp.json();
+      existingSha = existing.sha;
+    }
+
+    const contentBase64 = Buffer.from(content, 'utf-8').toString('base64');
+    const message = commitMessage || `ci: add ${filePath}`;
+    const body: Record<string, string> = { message, content: contentBase64 };
+    if (existingSha) body.sha = existingSha;
+
+    const commitResp = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/contents/${encodedPath}`,
+      { method: 'PUT', headers: ghHeaders, body: JSON.stringify(body) }
+    );
+
+    if (!commitResp.ok) {
+      const errData: any = await commitResp.json();
+      res.status(commitResp.status).json({ error: errData.message || 'Failed to commit file' });
+      return;
+    }
+
+    const commitData: any = await commitResp.json();
+    res.json({
+      success: true,
+      commitSha: commitData.commit?.sha,
+      htmlUrl: commitData.content?.html_url,
+      message: `${filePath} committed to ${owner}/${repo}`,
+    });
+  } catch (err: any) {
+    console.error('[GITHUB] workflow-commit error:', err);
+    res.status(500).json({ error: err.message || 'Failed to commit file' });
+  }
+});
+
+// ─── POST /api/github/readme-generate ────────────────────────────────────────
+// Body: { owner, repo } — fetches repo info, calls AI, returns readmeContent
+router.post('/readme-generate', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { owner, repo } = req.body;
+  if (!owner || !repo) {
+    res.status(400).json({ error: 'owner and repo are required' });
+    return;
+  }
+
+  try {
+    const tokenResult = await pool.query(
+      'SELECT access_token FROM public.user_github_tokens WHERE user_id = $1 AND connected = true',
+      [req.userId]
+    );
+    if (!tokenResult.rows[0]) {
+      res.status(401).json({ error: 'GitHub not connected' });
+      return;
+    }
+    const { access_token } = tokenResult.rows[0];
+    const ghHeaders = {
+      Authorization: `token ${access_token}`,
+      Accept: 'application/vnd.github.v3+json',
+    };
+
+    // Fetch repo metadata and recent commits in parallel
+    const [repoResp, commitsResp, languagesResp] = await Promise.all([
+      fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers: ghHeaders }),
+      fetch(`https://api.github.com/repos/${owner}/${repo}/commits?per_page=10`, { headers: ghHeaders }),
+      fetch(`https://api.github.com/repos/${owner}/${repo}/languages`, { headers: ghHeaders }),
+    ]);
+
+    if (!repoResp.ok) {
+      res.status(repoResp.status).json({ error: 'Failed to fetch repo details from GitHub' });
+      return;
+    }
+
+    const repoData: any = await repoResp.json();
+    const commitsData: any[] = commitsResp.ok ? (await commitsResp.json()) as any[] : [];
+    const languagesData: Record<string, number> = languagesResp.ok ? (await languagesResp.json()) as Record<string, number> : {};
+
+    const recentCommits = commitsData
+      .slice(0, 10)
+      .map((c: any) => `- ${c.commit?.message?.split('\n')[0]} (${c.commit?.author?.name})`)
+      .join('\n') || 'No commits yet';
+
+    const topLanguages = Object.keys(languagesData).slice(0, 5).join(', ') || repoData.language || 'Not specified';
+    const topics = repoData.topics?.join(', ') || 'None';
+
+    // Call AI — Groq (free) first, fall back to OpenAI
+    const apiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY;
+    const isGroq = !!process.env.GROQ_API_KEY;
+    if (!apiKey) { res.status(500).json({ error: 'No AI provider configured (GROQ_API_KEY or OPENAI_API_KEY)' }); return; }
+
+    const prompt = `You are a professional technical writer. Generate a comprehensive, well-structured README.md file for the following GitHub repository.
+
+Repository Details:
+- Name: ${repoData.full_name}
+- Description: ${repoData.description || 'No description provided'}
+- Primary Language: ${topLanguages}
+- Topics/Tags: ${topics}
+- Visibility: ${repoData.private ? 'Private' : 'Public'}
+- Default Branch: ${repoData.default_branch || 'main'}
+- Stars: ${repoData.stargazers_count ?? 0} | Forks: ${repoData.forks_count ?? 0}
+- Recent Commits:
+${recentCommits}
+
+Requirements:
+1. Use proper Markdown formatting with headers, code blocks, and badges
+2. Include these sections: Project title with a badge row, Overview/About, Features, Tech Stack, Getting Started (Prerequisites + Installation + Usage), Project Structure (inferred), Contributing, License
+3. Infer specific, realistic content from the repo metadata and commits — avoid generic filler
+4. Keep it professional and developer-friendly
+5. Use emojis sparingly for section headers
+6. Output ONLY the raw Markdown — no surrounding explanation`;
+
+    const aiResp = await fetch(
+      isGroq ? 'https://api.groq.com/openai/v1/chat/completions' : 'https://api.openai.com/v1/chat/completions',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: isGroq ? 'openai/gpt-oss-120b' : 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: 'You are a professional technical writer specializing in open-source documentation.' },
+            { role: 'user', content: prompt },
+          ],
+        }),
+      }
+    );
+
+    if (!aiResp.ok) {
+      const errText = await aiResp.text();
+      res.status(500).json({ error: `AI error: ${errText}` });
+      return;
+    }
+
+    const aiData: any = await aiResp.json();
+    const readmeContent: string = aiData.choices?.[0]?.message?.content ?? '';
+
+    res.json({ readmeContent, repoFullName: repoData.full_name, defaultBranch: repoData.default_branch || 'main' });
+  } catch (err: any) {
+    console.error('[GITHUB] readme generate error:', err);
+    res.status(500).json({ error: err.message || 'Failed to generate README' });
+  }
+});
+
+// ─── POST /api/github/readme/commit ───────────────────────────────────────────
+// Body: { owner, repo, readmeContent, commitMessage? }
+// Commits README.md to the repo's default branch via the GitHub Contents API.
+router.post('/readme-commit', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { owner, repo, readmeContent, commitMessage } = req.body;
+  if (!owner || !repo || !readmeContent) {
+    res.status(400).json({ error: 'owner, repo, and readmeContent are required' });
+    return;
+  }
+
+  try {
+    const tokenResult = await pool.query(
+      'SELECT access_token FROM public.user_github_tokens WHERE user_id = $1 AND connected = true',
+      [req.userId]
+    );
+    if (!tokenResult.rows[0]) {
+      res.status(401).json({ error: 'GitHub not connected' });
+      return;
+    }
+    const { access_token } = tokenResult.rows[0];
+    const ghHeaders = {
+      Authorization: `token ${access_token}`,
+      Accept: 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
+    };
+
+    // Check if README.md already exists (need its SHA to update)
+    let existingSha: string | undefined;
+    const existingResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/README.md`, {
+      headers: ghHeaders,
+    });
+    if (existingResp.ok) {
+      const existing: any = await existingResp.json();
+      existingSha = existing.sha;
+    }
+
+    const contentBase64 = Buffer.from(readmeContent, 'utf-8').toString('base64');
+    const message = commitMessage || '📝 Add AI-generated README.md';
+
+    const body: Record<string, string> = {
+      message,
+      content: contentBase64,
+    };
+    if (existingSha) body.sha = existingSha;
+
+    const commitResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/README.md`, {
+      method: 'PUT',
+      headers: ghHeaders,
+      body: JSON.stringify(body),
+    });
+
+    if (!commitResp.ok) {
+      const errData: any = await commitResp.json();
+      res.status(commitResp.status).json({ error: errData.message || 'Failed to commit README' });
+      return;
+    }
+
+    const commitData: any = await commitResp.json();
+    res.json({
+      success: true,
+      commitSha: commitData.commit?.sha,
+      htmlUrl: commitData.content?.html_url,
+      message: `README.md successfully committed to ${owner}/${repo}`,
+    });
+  } catch (err: any) {
+    console.error('[GITHUB] readme commit error:', err);
+    res.status(500).json({ error: err.message || 'Failed to commit README' });
+  }
+});
+
 export default router;

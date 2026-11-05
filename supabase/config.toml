@@ -7,9 +7,6 @@ verify_jwt = false
 [functions.gitlab-oauth]
 verify_jwt = false
 
-[functions.stripe-webhook-unlock]
-verify_jwt = false
-
 [functions.github-data]
 verify_jwt = true
 

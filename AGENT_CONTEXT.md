@@ -9,7 +9,7 @@
 **Magic AI** is a developer productivity SaaS application. It bundles several everyday tools that developers use — all in one place with an AI-powered backend.
 
 - **Target Users:** Software developers / freelancers
-- **Monetization:** One-time lifetime payment ($5) via Stripe or Razorpay
+- **Monetization:** One-time lifetime payment (₹499) via Razorpay
 - **Free Tier:** 50 AI feature uses per month, then paywalled
 - **Live URL:** `https://magicaidevops.netlify.app`
 - **Frontend:** React + Vite + TypeScript + TailwindCSS + shadcn/ui
@@ -46,7 +46,7 @@ magic-ai/
 │   │   ├── VersionControlPage.tsx # GitHub + GitLab integration
 │   │   ├── RepoDetailsPage.tsx    # Repo detail with commits, branches
 │   │   ├── StructureTemplatesPage.tsx # Custom output format templates
-│   │   ├── PaymentPage.tsx        # Stripe/Razorpay payment UI
+│   │   ├── PaymentPage.tsx        # Razorpay payment UI (₹499 one-time)
 │   │   └── NotFound.tsx
 │   ├── services/
 │   │   ├── openaiService.ts       # All AI feature calls → Supabase Edge Functions
@@ -76,8 +76,6 @@ magic-ai/
 │   │   ├── gitlab-data/           # Fetch user GitLab projects
 │   │   ├── common-git-action/     # Perform git operations
 │   │   ├── create-razorpay-order/ # Create Razorpay payment order
-│   │   ├── create-stripe-checkout/# Create Stripe checkout session
-│   │   ├── stripe-webhook-unlock/ # Stripe webhook → marks user as paid
 │   │   └── verify-razorpay-payment/ # Verify Razorpay signature → marks paid
 │   └── migrations/                # PostgreSQL schema migrations (7 files)
 └── public/
@@ -144,7 +142,7 @@ All tables live in the `public` schema.
 |---|---|---|
 | id | UUID | PK |
 | user_id | UUID | FK |
-| payment_provider | TEXT | "stripe" or "razorpay" |
+| payment_provider | TEXT | "razorpay" |
 | payment_id | TEXT | Provider's order/session ID |
 | amount | NUMERIC | |
 | currency | TEXT | |
@@ -261,9 +259,8 @@ Similar structure to `user_github_tokens`.
 - After payment: `paid_user = true` in profiles table → unlimited access
 
 ### 10. **Payment** (`/payment`)
-- Stripe: `create-stripe-checkout` → user redirected → webhook `stripe-webhook-unlock` sets paid
-- Razorpay: `create-razorpay-order` → frontend collects card → `verify-razorpay-payment` validates signature → sets paid
-- One-time lifetime price: $5 USD
+- Razorpay: `create-razorpay-order` → frontend opens Razorpay checkout → `verify-razorpay-payment` validates HMAC signature → sets `paid_user = true`
+- One-time lifetime price: ₹499 INR
 
 ---
 
@@ -319,8 +316,6 @@ GITLAB_CLIENT_ID=...
 GITLAB_CLIENT_SECRET=...
 RAZORPAY_KEY_ID=...
 RAZORPAY_KEY_SECRET=...
-STRIPE_SECRET_KEY=...
-STRIPE_WEBHOOK_SECRET=...
 APP_URL=https://...
 FRONTEND_URL=https://magicaidevops.netlify.app
 DATABASE_URL=postgresql://user:pass@host:5432/dbname
@@ -354,7 +349,7 @@ JWT_SECRET=...
 | ORM/Query | Supabase JS Client | pg / Prisma |
 | Backend | Supabase Edge Functions (Deno) | Node.js + Express |
 | AI | OpenAI gpt-4o-mini | Same |
-| Payments | Stripe + Razorpay | Same (via Node.js routes) |
+| Payments | Stripe + Razorpay | Razorpay only |
 | Hosting | Netlify (frontend) | Netlify + separate Node.js host |
 
 ---
@@ -362,7 +357,7 @@ JWT_SECRET=...
 ## 🔑 Key Business Rules
 
 1. **Free limit**: 50 AI feature uses per month. Tracked in `feature_usage`.
-2. **Paid unlock**: One-time $5 payment → `profiles.paid_user = true` → unlimited forever.
+2. **Paid unlock**: One-time ₹499 payment via Razorpay → `profiles.paid_user = true` → unlimited forever.
 3. **Monthly reset**: `feature_usage` reset monthly (via PostgreSQL function).
 4. **Protected routes**: All feature pages require authentication.
 5. **OAuth tokens**: GitHub/GitLab tokens stored encrypted in DB. One token per user per provider.
