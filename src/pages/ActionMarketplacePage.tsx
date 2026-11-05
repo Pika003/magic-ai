@@ -969,28 +969,30 @@ interface MarketplaceCardProps {
 const MarketplaceCard: React.FC<MarketplaceCardProps> = ({ item, provider, onClick }) => (
   <Card
     onClick={onClick}
-    className="cursor-pointer hover:border-blue-400 hover:shadow-md transition-all duration-200 group"
+    className="cursor-pointer hover:border-indigo-500/50 hover:shadow-lg transition-all duration-200 group bg-card border-border/70 flex flex-col justify-between"
   >
     <CardContent className="p-4 space-y-3">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-md bg-slate-100 group-hover:bg-blue-50 transition-colors">
+          <div className="p-1.5 rounded-lg bg-muted group-hover:bg-indigo-500/10 transition-colors">
             {provider === "github"
-              ? <Github className="w-4 h-4 text-slate-600" />
+              ? <Github className="w-4 h-4 text-foreground" />
               : <Gitlab className="w-4 h-4 text-orange-500" />}
           </div>
-          <h3 className="font-semibold text-slate-800 text-sm leading-tight">{item.name}</h3>
+          <h3 className="font-semibold text-foreground text-sm leading-tight group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+            {item.name}
+          </h3>
         </div>
-        <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-400 transition-colors shrink-0 mt-0.5" />
+        <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-indigo-500 transition-colors shrink-0 mt-0.5 group-hover:translate-x-0.5" />
       </div>
 
-      <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">{item.description}</p>
+      <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{item.description}</p>
 
       <div className="flex items-center justify-between">
-        <Badge variant="secondary" className="flex items-center gap-1 text-xs">
+        <Badge variant="secondary" className="flex items-center gap-1 text-[11px] font-medium">
           {categoryIcon(item.category)} {item.category}
         </Badge>
-        <span className="flex items-center gap-1 text-xs text-amber-600 font-medium">
+        <span className="flex items-center gap-1 text-xs text-amber-500 font-semibold">
           <Star className="w-3 h-3 fill-amber-400 stroke-amber-500" />
           {item.stars.toLocaleString()}
         </span>
@@ -998,7 +1000,7 @@ const MarketplaceCard: React.FC<MarketplaceCardProps> = ({ item, provider, onCli
 
       <div className="flex flex-wrap gap-1">
         {item.tags.slice(0, 3).map((tag) => (
-          <span key={tag} className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-mono">
+          <span key={tag} className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-mono">
             #{tag}
           </span>
         ))}
@@ -1037,62 +1039,70 @@ const ActionMarketplacePage: React.FC = () => {
   };
 
   return (
-    <div className="w-full pt-8 pb-16">
+    <div className="w-full space-y-6 pb-12">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
-          <ShoppingBag className="w-7 h-7 text-blue-500" />
-          Action Marketplace
-        </h1>
-        <p className="text-muted-foreground">
-          Browse GitHub Actions and GitLab CI templates. Preview YAML and commit workflow files directly to your repositories.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Action Marketplace</h1>
+            <Badge variant="outline" className="text-xs font-mono">
+              CI / CD Presets
+            </Badge>
+          </div>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+            Browse battle-tested GitHub Actions and GitLab CI templates. Preview YAML and commit directly to your active branches.
+          </p>
+        </div>
       </div>
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
-          <TabsList>
-            <TabsTrigger value="github" className="flex items-center gap-2">
+          <TabsList className="h-10 bg-muted/60 p-1 border border-border/60 rounded-xl">
+            <TabsTrigger value="github" className="flex items-center gap-2 text-xs font-medium rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
               <Github className="w-4 h-4" /> GitHub Actions
-              <span className="ml-1 text-xs text-slate-400">({GITHUB_ACTIONS.length})</span>
+              <Badge variant="secondary" className="ml-1 text-[10px] py-0 px-1.5">
+                {GITHUB_ACTIONS.length}
+              </Badge>
             </TabsTrigger>
-            <TabsTrigger value="gitlab" className="flex items-center gap-2">
-              <Gitlab className="w-4 h-4" /> GitLab CI Templates
-              <span className="ml-1 text-xs text-slate-400">({GITLAB_TEMPLATES.length})</span>
+            <TabsTrigger value="gitlab" className="flex items-center gap-2 text-xs font-medium rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
+              <Gitlab className="w-4 h-4 text-orange-500" /> GitLab CI Templates
+              <Badge variant="secondary" className="ml-1 text-[10px] py-0 px-1.5">
+                {GITLAB_TEMPLATES.length}
+              </Badge>
             </TabsTrigger>
           </TabsList>
         </div>
 
         {(["github", "gitlab"] as const).map((tab) => (
-          <TabsContent key={tab} value={tab} className="mt-0">
+          <TabsContent key={tab} value={tab} className="mt-0 space-y-4">
             {/* Search + filter bar */}
-            <div className="flex flex-col sm:flex-row gap-3 mb-6">
+            <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   placeholder={`Search ${tab === "github" ? "GitHub Actions" : "GitLab CI templates"}...`}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9"
+                  className="pl-9 h-9 text-xs"
                 />
                 {search && (
-                  <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                  <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                     <X className="w-4 h-4" />
                   </button>
                 )}
               </div>
 
               {/* Category pills */}
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5">
                 {["All", ...categories].map((cat) => (
                   <button
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
                       selectedCategory === cat
-                        ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-                        : "bg-white text-slate-600 border-slate-200 hover:border-blue-300 hover:text-blue-600"
+                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                        : "bg-card text-muted-foreground border-border hover:border-indigo-400 hover:text-foreground"
                     }`}
                   >
                     {cat !== "All" && categoryIcon(cat)}
@@ -1103,7 +1113,7 @@ const ActionMarketplacePage: React.FC = () => {
             </div>
 
             {/* Results count */}
-            <p className="text-xs text-slate-400 mb-4">
+            <p className="text-xs text-muted-foreground">
               {filtered.length} {filtered.length === 1 ? "template" : "templates"} found
               {selectedCategory !== "All" && ` in ${selectedCategory}`}
               {search && ` matching "${search}"`}
@@ -1111,10 +1121,10 @@ const ActionMarketplacePage: React.FC = () => {
 
             {/* Grid */}
             {filtered.length === 0 ? (
-              <div className="text-center py-16 text-slate-400">
+              <div className="text-center py-16 text-muted-foreground">
                 <Search className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                <p className="font-medium">No templates found</p>
-                <p className="text-sm mt-1">Try a different search or category</p>
+                <p className="font-semibold text-sm">No templates found</p>
+                <p className="text-xs mt-1">Try a different search term or category filter</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

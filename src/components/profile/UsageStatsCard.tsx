@@ -3,59 +3,98 @@ import { Progress } from '@/components/ui/progress';
 import { useUsageTracking } from '@/hooks/useUsageTracking';
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { Sparkles, RefreshCw, Zap, CheckCircle2 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 export const UsageStatsCard = () => {
   const { totalUsage, loading, isPaidUser, resetDate, fetchTotalUsage } = useUsageTracking();
   const navigate = useNavigate();
 
-  // If paid, always show unlimited
+  // If paid, show unlimited status
   if (isPaidUser) {
     return (
-      <div className="p-6 border rounded-lg bg-white flex flex-col justify-center gap-4 h-full w-full">
-        <div className="text-center">
-          <h3 className="text-lg font-semibold text-slate-700 mb-2">Usage Statistics</h3>
-          <p className="text-green-600 font-bold text-lg mb-2">Unlimited Usage</p>
-          <div className="text-md text-slate-500">Thank you for upgrading. Enjoy unlimited features forever!</div>
+      <Card className="border-border/70 shadow-sm bg-gradient-to-br from-card via-card to-amber-500/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <Zap className="w-4 h-4 text-amber-500" />
+            <span>Usage & Tier</span>
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Your current plan limits and allocation
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center">
+            <p className="text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+              Active Plan
+            </p>
+            <p className="text-xl font-extrabold text-foreground mt-1 flex items-center justify-center gap-1.5">
+              <span>Unlimited Pro</span>
+              <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Lifetime license active. Zero restrictions on AI features.
+            </p>
+          </div>
+
           <Button
-            variant="secondary"
-            className="mt-4"
+            variant="outline"
+            size="sm"
+            className="w-full text-xs h-8 gap-1.5 border-border"
             onClick={fetchTotalUsage}
+            disabled={loading}
           >
-            Refresh Status
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>Sync Usage Status</span>
           </Button>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     );
   }
 
-  const usagePercentage = Math.min((totalUsage / 50) * 100, 100);
+  const usagePercentage = Math.min(((totalUsage || 0) / 50) * 100, 100);
+  const remaining = Math.max(50 - (totalUsage || 0), 0);
 
   return (
-    <div className="p-6 border rounded-lg bg-white flex flex-col justify-center gap-4 h-full w-full">
-      <div className="text-center">
-        <h3 className="text-lg font-semibold text-slate-700 mb-2">Usage Statistics</h3>
-        <p className="text-sm text-slate-500 mb-4">
-          Monthly API usage ({resetDate ? `Resets: ${resetDate.toLocaleDateString()}` : 'Resets every month'})
-        </p>
-      </div>
-      <div className="space-y-3">
-        <div className="flex justify-between items-center">
-          <span className="text-sm font-medium text-slate-600">Total Usage</span>
-          <span className={`text-sm font-bold ${totalUsage >= 50 ? 'text-red-600' : totalUsage >= 40 ? 'text-orange-600' : 'text-green-600'}`}>
-            {loading ? '-' : `${totalUsage} / 50`}
+    <Card className="border-border/70 shadow-sm bg-card/80">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-semibold flex items-center justify-between">
+          <span>Free Usage Limits</span>
+          <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
+            {totalUsage} / 50
           </span>
+        </CardTitle>
+        <CardDescription className="text-xs">
+          Monthly quota resets {resetDate ? `on ${resetDate.toLocaleDateString()}` : 'each calendar month'}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-muted-foreground">Used this month</span>
+            <span className="font-semibold text-foreground">{Math.round(usagePercentage)}%</span>
+          </div>
+          <Progress
+            value={usagePercentage}
+            className="h-2 bg-muted"
+          />
+          <div className="flex justify-between items-center text-[11px] text-muted-foreground">
+            <span>{remaining} queries remaining</span>
+            <span>50 max limit</span>
+          </div>
         </div>
-        <Progress 
-          value={usagePercentage}
-          className={`h-3 ${totalUsage >= 50 ? 'bg-red-100' : totalUsage >= 40 ? 'bg-orange-100' : 'bg-green-100'}`}
-        />
-        <div className="text-xs text-slate-400 text-center">
-          {loading ? 'Loading...' : `${Math.round(usagePercentage)}% of free monthly limit used`}
+
+        <div className="pt-2">
+          <Button
+            size="sm"
+            onClick={() => navigate('/payment')}
+            className="w-full h-8 text-xs font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-sm"
+          >
+            <Sparkles className="w-3.5 h-3.5 mr-1.5" />
+            Upgrade to Unlimited (₹499)
+          </Button>
         </div>
-        <div className="text-xs text-slate-500 text-center">
-          {resetDate ? `Your usage will reset on ${resetDate.toLocaleDateString()}` : 'Usage resets monthly'}
-        </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 };

@@ -1,24 +1,30 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import { Navigation } from './Navigation';
 import { Sidebar } from './Sidebar';
 import { useAuth } from '@/contexts/AuthContext';
 
 export const Layout = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
+  const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-background text-foreground flex flex-col transition-colors duration-200">
       <Navigation />
-      <div className="flex pt-0">
+      <div className="flex-1 flex">
         {user && (
-          <div className="shrink-0 hidden md:block">
-            <Sidebar />
+          <div className="hidden md:block shrink-0">
+            <Sidebar
+              collapsed={collapsed}
+              onToggleCollapse={() => setCollapsed(!collapsed)}
+            />
           </div>
         )}
-        <main className={`flex-1 pt-10 px-2 md:px-4 ${user ? 'md:ml-64' : ''}`}>
-          {/* Removed max-w-7xl mx-auto container for correct full-width */}
-          <div className="w-full">
+        <main
+          className={`flex-1 min-w-0 transition-all duration-300 ${
+            user ? (collapsed ? 'md:pl-20' : 'md:pl-64') : ''
+          }`}
+        >
+          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             {children}
           </div>
         </main>

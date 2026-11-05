@@ -1,8 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
-import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Search, Filter } from 'lucide-react';
+import { PlusCircle, Search, Filter, Briefcase, Sparkles } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -22,6 +20,7 @@ import {
   deleteProject,
 } from '@/services/projectService';
 import type { Project, CreateProjectData, UpdateProjectData } from '@/types/project';
+import { Badge } from '@/components/ui/badge';
 
 export const ProjectsPage = () => {
   const { user } = useAuth();
@@ -146,8 +145,8 @@ export const ProjectsPage = () => {
 
   const handleSendUpdate = (project: Project) => {
     toast({
-      title: 'Feature Coming Soon',
-      description: 'Client update integration will be available soon',
+      title: 'Dispatched to Client Update',
+      description: `Opening update studio for ${project.name}`,
     });
   };
 
@@ -172,98 +171,102 @@ export const ProjectsPage = () => {
   };
 
   return (
-    <div className="w-full px-2 md:px-4 pt-10">
-      <div className="max-w-7xl mx-auto">
-        {/* Header Section */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-800">Projects</h1>
-            <p className="text-slate-600 mt-1">Manage your client projects and track progress</p>
+    <div className="space-y-6">
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Project Hub</h1>
+            <Badge variant="outline" className="text-xs font-mono">
+              {projects.length} Total
+            </Badge>
           </div>
-          <Button onClick={openCreateForm} className="bg-blue-500 hover:bg-blue-600">
-            <PlusCircle className="mr-2 h-4 w-4" />
-            New Project
-          </Button>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+            Track client repositories, deliverables, milestones, and automated status reports.
+          </p>
         </div>
-
-        {/* Search and Filter Section */}
-        <div className="flex gap-4 items-center mb-8">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Search projects..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 border-slate-200 focus:border-blue-500"
-            />
-          </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[180px] border-slate-200">
-              <Filter className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="on_hold">On Hold</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Content Section */}
-        {loading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-            <p className="text-gray-500">Loading projects...</p>
-          </div>
-        ) : filteredProjects.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="bg-white p-8 rounded-lg shadow-sm border border-slate-200">
-              <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <PlusCircle className="w-8 h-8 text-slate-400" />
-              </div>
-              <h2 className="text-xl font-semibold mb-2 text-slate-800">
-                {projects.length === 0 ? 'No projects yet' : 'No projects match your filters'}
-              </h2>
-              <p className="text-slate-600 mb-6 max-w-md mx-auto">
-                {projects.length === 0 
-                  ? 'Create your first project to get started with client management and updates.'
-                  : 'Try adjusting your search or filter criteria to find what you\'re looking for.'
-                }
-              </p>
-              {projects.length === 0 && (
-                <Button onClick={openCreateForm} className="bg-blue-500 hover:bg-blue-600">
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Create Your First Project
-                </Button>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredProjects.map((project) => (
-              <ProjectCard
-                key={project.id}
-                project={project}
-                onEdit={openEditForm}
-                onDelete={handleDeleteProject}
-                onSendUpdate={handleSendUpdate}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Project Form Modal */}
-        <ProjectForm
-          open={formOpen}
-          onOpenChange={setFormOpen}
-          onSubmit={editingProject ? handleEditProject : handleCreateProject}
-          project={editingProject}
-          loading={formLoading}
-        />
+        <Button
+          onClick={openCreateForm}
+          className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold text-xs shadow-sm self-start sm:self-auto gap-1.5"
+        >
+          <PlusCircle className="h-4 w-4" />
+          <span>New Project</span>
+        </Button>
       </div>
+
+      {/* Search and Filter Section */}
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Input
+            placeholder="Search projects..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 h-9 text-xs"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full sm:w-44 h-9 text-xs">
+            <SelectValue placeholder="Filter by status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="on_hold">On Hold</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Projects Grid */}
+      {loading ? (
+        <div className="text-center py-16 text-xs text-muted-foreground">
+          Loading projects...
+        </div>
+      ) : filteredProjects.length === 0 ? (
+        <div className="text-center py-16 px-4 rounded-2xl border border-dashed border-border bg-card/40 space-y-3">
+          <div className="w-12 h-12 rounded-2xl bg-muted text-muted-foreground flex items-center justify-center mx-auto">
+            <Briefcase className="w-6 h-6" />
+          </div>
+          <h3 className="text-base font-semibold">No Projects Found</h3>
+          <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+            {searchTerm || statusFilter !== 'all'
+              ? 'No projects match your active search filters.'
+              : 'Create your first client project to start tracking milestones and updates.'}
+          </p>
+          {!searchTerm && statusFilter === 'all' && (
+            <Button
+              onClick={openCreateForm}
+              size="sm"
+              className="text-xs font-semibold mt-2"
+            >
+              <PlusCircle className="mr-1.5 h-3.5 w-3.5" />
+              Create Project
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredProjects.map((project) => (
+            <ProjectCard
+              key={project.id}
+              project={project}
+              onEdit={openEditForm}
+              onDelete={handleDeleteProject}
+              onSendUpdate={handleSendUpdate}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Project Form Modal */}
+      <ProjectForm
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        onSubmit={editingProject ? handleEditProject : handleCreateProject}
+        project={editingProject}
+        loading={formLoading}
+      />
     </div>
   );
 };

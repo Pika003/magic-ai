@@ -1,6 +1,14 @@
 # Magic AI — Agent Context Document
 
-> **Purpose:** This document is the single source of truth for any AI agent or developer working on this project. Read this first before touching any code.
+> **CRITICAL DIRECTIVE (Nov 2026):**
+> Refer to `AGENT_CORE_DIRECTIVE.md` and `public/PRODUCT_REQUIREMENTS_AND_TECHNICAL_ARCHITECTURE.md`.
+> The platform is strictly a **SaaS Developer Operations (DevOps) Platform**.
+> The **ONLY** active user-facing modules are:
+> 1. **Version Control** (`/version-control`, `/version-control/github/:id`, `/version-control/gitlab/:id`)
+> 2. **Action Marketplace** (`/action-marketplace`)
+> 3. **Auth, Profile, and Payment** (`/auth`, `/profile`, `/payment`)
+>
+> ❌ **DO NOT** re-introduce or display "AI Productivity" modules (CorrectSentence, TodaysUpdate, ClientUpdate, StructureTemplates, Projects).
 
 ---
 

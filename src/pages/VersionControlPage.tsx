@@ -1,14 +1,15 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { GitBranch, Github, Gitlab, Unlink } from "lucide-react";
+import { GitBranch, Github, Gitlab, RefreshCw, Loader2, Sparkles } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { api, getToken } from "@/lib/apiClient";
 import { useVersionControl } from "@/hooks/useVersionControl";
 import { RepositoryList } from "@/components/version-control/RepositoryList";
 import { ConnectionStatus } from "@/components/version-control/ConnectionStatus";
+import { Badge } from "@/components/ui/badge";
 
 const handleOAuthStart = async (provider: 'github' | 'gitlab') => {
   const token = getToken();
@@ -31,20 +32,21 @@ const handleOAuthStart = async (provider: 'github' | 'gitlab') => {
       toast({
         title: "OAuth Error",
         description: "Failed to get OAuth URL. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   } catch (error: any) {
     toast({
       title: "Connection Error",
       description: error.message || "Error connecting to OAuth service.",
-      variant: "destructive"
+      variant: "destructive",
     });
   }
 };
 
 export const VersionControlPage = () => {
   const [activeTab, setActiveTab] = useState("github");
+  const [refreshing, setRefreshing] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const {
@@ -55,7 +57,7 @@ export const VersionControlPage = () => {
     loading,
     checkConnections,
     fetchDataForTab,
-    handleDisconnect
+    handleDisconnect,
   } = useVersionControl();
 
   // Handle OAuth callback parameters
@@ -72,15 +74,12 @@ export const VersionControlPage = () => {
           description: `Your ${provider} account has been connected.`,
         });
 
-        // If GitLab was just connected, switch to the GitLab tab
         if (provider === 'gitlab') {
           setActiveTab('gitlab');
         }
-        // Check connections after successful OAuth
         const timer = setTimeout(() => {
           checkConnections();
         }, 1000);
-        // Clean up URL after processing
         const navigateTimer = setTimeout(() => {
           navigate(location.pathname, { replace: true });
         }, 2000);
@@ -95,7 +94,6 @@ export const VersionControlPage = () => {
           description: message || 'An unknown error occurred.',
           variant: 'destructive',
         });
-        // Clean up URL after error
         const timer = setTimeout(() => {
           navigate(location.pathname, { replace: true });
         }, 2000);
@@ -113,130 +111,115 @@ export const VersionControlPage = () => {
     }
   }, [activeTab, githubConnected, gitlabConnected, githubRepos.length, gitlabProjects.length, fetchDataForTab]);
 
+  const handleManualRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await checkConnections();
+      await fetchDataForTab(activeTab as 'github' | 'gitlab');
+      toast({ title: 'Refreshed', description: 'Repository list synchronized.' });
+    } catch {
+      toast({ title: 'Refresh failed', description: 'Could not sync repositories.', variant: 'destructive' });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   if (loading) {
     return (
-      <div className="w-full h-full pt-10 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+      <div className="py-24 flex flex-col items-center justify-center gap-3">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+        <p className="text-xs text-muted-foreground font-mono">Synchronizing repositories...</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full h-full pt-10">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
-          <GitBranch className="w-7 h-7 text-blue-500" />
-          Version Control Management
-        </h1>
-        <p className="text-muted-foreground">
-          Manage your GitHub and GitLab repositories, branches, commits, and utilize AI-powered features.
-        </p>
-      </div>
-      
-      <div className="flex gap-4 mb-6">
-        <div className="flex items-center gap-2">
-          <Button
-            onClick={() => handleOAuthStart("github")}
-            className="bg-black text-white px-4 py-2 rounded shadow flex items-center gap-2 hover:bg-gray-900"
-            disabled={githubConnected}
-          >
-            <Github className="w-5 h-5" />
-            {githubConnected ? 'GitHub Connected' : 'Connect GitHub'}
-          </Button>
-          {githubConnected && (
-            <Button
-              onClick={() => handleDisconnect("github")}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              <Unlink className="w-4 h-4" />
-              Disconnect
-            </Button>
-          )}
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Version Control</h1>
+            <Badge variant="outline" className="text-xs font-mono">
+              Git Hub & GitLab
+            </Badge>
+          </div>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+            Manage your Git providers, inspect branches, generate automated AI READMEs, and commit CI/CD workflows.
+          </p>
         </div>
-        
-        <div className="flex items-center gap-2">
-          <Button
-            onClick={() => handleOAuthStart("gitlab")}
-            className="bg-[#fca326] text-white px-4 py-2 rounded shadow flex items-center gap-2 hover:bg-[#e09b1f]"
-            disabled={gitlabConnected}
-          >
-            <Gitlab className="w-5 h-5" />
-            {gitlabConnected ? 'GitLab Connected' : 'Connect GitLab'}
-          </Button>
-          {gitlabConnected && (
-            <Button
-              onClick={() => handleDisconnect("gitlab")}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              <Unlink className="w-4 h-4" />
-              Disconnect
-            </Button>
-          )}
-        </div>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleManualRefresh}
+          disabled={refreshing}
+          className="h-9 text-xs gap-1.5 self-start sm:self-auto border-border"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+          <span>Sync Repos</span>
+        </Button>
       </div>
 
+      {/* Provider Connection Cards */}
       <ConnectionStatus
         githubConnected={githubConnected}
         gitlabConnected={gitlabConnected}
-        onRefresh={checkConnections}
+        onRefresh={handleManualRefresh}
+        refreshing={refreshing}
+        onConnectGitHub={() => handleOAuthStart('github')}
+        onDisconnectGitHub={() => handleDisconnect('github')}
+        onConnectGitLab={() => handleOAuthStart('gitlab')}
+        onDisconnectGitLab={() => handleDisconnect('gitlab')}
       />
-      
+
+      {/* Provider Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="mb-6">
-          <TabsTrigger value="github" className="flex items-center gap-2">
-            <Github className="w-5 h-5" /> GitHub ({githubRepos.length})
+        <TabsList className="h-10 bg-muted/60 p-1 border border-border/60 rounded-xl mb-6">
+          <TabsTrigger
+            value="github"
+            className="flex items-center gap-2 text-xs font-medium rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm"
+          >
+            <Github className="w-4 h-4" />
+            <span>GitHub</span>
+            {githubConnected && (
+              <Badge variant="secondary" className="text-[10px] py-0 px-1.5 ml-1">
+                {githubRepos.length}
+              </Badge>
+            )}
           </TabsTrigger>
-          <TabsTrigger value="gitlab" className="flex items-center gap-2">
-            <Gitlab className="w-5 h-5" /> GitLab ({gitlabProjects.length})
+          <TabsTrigger
+            value="gitlab"
+            className="flex items-center gap-2 text-xs font-medium rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm"
+          >
+            <Gitlab className="w-4 h-4 text-[#fc6d26]" />
+            <span>GitLab</span>
+            {gitlabConnected && (
+              <Badge variant="secondary" className="text-[10px] py-0 px-1.5 ml-1">
+                {gitlabProjects.length}
+              </Badge>
+            )}
           </TabsTrigger>
         </TabsList>
-        
-        <TabsContent value="github">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Github className="w-5 h-5" />
-                  GitHub Repositories
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <RepositoryList
-                  githubRepos={githubRepos}
-                  gitlabProjects={[]}
-                  githubConnected={githubConnected}
-                  gitlabConnected={false}
-                  activeTab="github"
-                />
-              </CardContent>
-            </Card>
-          </div>
+
+        <TabsContent value="github" className="mt-0 space-y-4">
+          <RepositoryList
+            githubRepos={githubRepos}
+            gitlabProjects={[]}
+            githubConnected={githubConnected}
+            gitlabConnected={false}
+            activeTab="github"
+          />
         </TabsContent>
-        
-        <TabsContent value="gitlab">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Gitlab className="w-5 h-5" />
-                  GitLab Projects
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <RepositoryList
-                  githubRepos={[]}
-                  gitlabProjects={gitlabProjects}
-                  githubConnected={false}
-                  gitlabConnected={gitlabConnected}
-                  activeTab="gitlab"
-                />
-              </CardContent>
-            </Card>
-          </div>
+
+        <TabsContent value="gitlab" className="mt-0 space-y-4">
+          <RepositoryList
+            githubRepos={[]}
+            gitlabProjects={gitlabProjects}
+            githubConnected={false}
+            gitlabConnected={gitlabConnected}
+            activeTab="gitlab"
+          />
         </TabsContent>
       </Tabs>
     </div>

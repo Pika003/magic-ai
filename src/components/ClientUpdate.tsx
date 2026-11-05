@@ -22,6 +22,7 @@ import {
   Briefcase,
   Check,
   Calendar,
+  Sparkles,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { generateClientUpdateWithAI } from '@/services/openaiService';
@@ -49,81 +50,94 @@ export const ClientUpdate = () => {
   const [recipientEmail, setRecipientEmail] = useState('');
   const [liveLink, setLiveLink] = useState('');
   const [originalMessage, setOriginalMessage] = useState('');
-  const [tone, setTone] = useState<'friendly' | 'executive' | 'milestone'>('friendly');
+  const [yourName, setYourName] = useState('');
+  const [tone, setTone] = useState<'professional' | 'casual' | 'executive'>('professional');
+
   const [formattedUpdate, setFormattedUpdate] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [clientUpdates, setClientUpdates] = useState<ClientUpdateRecord[]>([]);
-  const [yourName, setYourName] = useState('Your Name');
   const [copied, setCopied] = useState(false);
+
+  const [clientUpdates, setClientUpdates] = useState<ClientUpdateRecord[]>([]);
   const { incrementUsage, hasReachedLimit } = useUsageTracking();
 
   useEffect(() => {
-    if (user?.fullName) {
-      setYourName(user.fullName);
+    if (user) {
+      loadProjects();
     }
-    // Load projects
-    getProjects().then((data) => setProjects(data || [])).catch(() => {});
   }, [user]);
 
-  // Handle project selection
-  const handleSelectProject = (projectId: string) => {
-    setSelectedProjectId(projectId);
-    if (projectId === 'custom') {
-      return;
-    }
-    const found = projects.find((p) => p.id === projectId);
-    if (found) {
-      if (found.client_name) setClientName(found.client_name);
-      if (found.client_email) setRecipientEmail(found.client_email);
-      if (found.live_link) setLiveLink(found.live_link);
+  const loadProjects = async () => {
+    if (!user) return;
+    try {
+      const data = await getProjects(user.id);
+      setProjects(data);
+    } catch {
+      // ignore
     }
   };
 
-  const selectedProject = projects.find((p) => p.id === selectedProjectId);
+  const handleProjectSelect = (val: string) => {
+    setSelectedProjectId(val);
+    if (val === 'custom') {
+      setClientName('');
+      setRecipientEmail('');
+      return;
+    }
+    const found = projects.find((p) => p.id === val);
+    if (found) {
+      setClientName(found.client_name || found.name);
+      setRecipientEmail(found.client_email || '');
+    }
+  };
 
   const processMessage = async (isRefresh: boolean = false) => {
-    if (!originalMessage.trim() || !clientName.trim()) {
+    if (!originalMessage.trim()) {
       toast({
-        title: 'Missing information',
-        description: 'Please enter a client name and update notes.',
+        title: 'Notes required',
+        description: 'Please describe the work done or progress made.',
         variant: 'destructive',
       });
       return;
     }
-
+    if (!clientName.trim()) {
+      toast({
+        title: 'Client name required',
+        description: 'Please provide the client or stakeholder name.',
+        variant: 'destructive',
+      });
+      return;
+    }
     if (hasReachedLimit) {
       toast({
         title: 'Usage limit reached',
-        description: "You've reached your free usage limit. Please upgrade for unlimited access.",
+        description: 'Upgrade to unlimited for ₹499.',
         variant: 'destructive',
       });
       return;
     }
 
     setIsProcessing(true);
-
     try {
-      const usageSuccess = await incrementUsage('generate_client_update');
-      if (!usageSuccess) return;
+      await incrementUsage('generate_client_update');
+      const enhancedMessage = `[Tone: ${tone}]\n${originalMessage}`;
 
-      const contextualMessage = `[Tone: ${tone}]\n${originalMessage}`;
-      const generated = await generateClientUpdateWithAI(
-        contextualMessage,
+      const result = await generateClientUpdateWithAI(
+        enhancedMessage,
         clientName,
         liveLink,
-        yourName,
+        yourName || user?.email?.split('@')[0] || 'Your Team',
         isRefresh
       );
 
-      setFormattedUpdate(generated);
+      setFormattedUpdate(result);
       toast({
-        title: isRefresh ? 'Update Refreshed' : 'Client Update Generated',
-        description: 'Review your update and dispatch or copy it below.',
+        title: isRefresh ? 'Alternative generated!' : 'Client update ready! ✨',
+        description: 'Review and send directly or copy to clipboard.',
       });
-    } catch (error: any) {
+    } catch (err: any) {
       toast({
-        title: 'Generation Failed',
-        description: error.message || 'Failed to generate client update.',
+        title: 'Generation failed',
+        description: err.message || 'Error processing update.',
         variant: 'destructive',
       });
     } finally {
@@ -134,59 +148,45 @@ export const ClientUpdate = () => {
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopied(true);
-    toast({
-      title: 'Copied!',
-      description: 'Update copied to clipboard.',
-    });
+    toast({ title: 'Copied to clipboard!' });
     setTimeout(() => setCopied(false), 2000);
   };
 
   const saveAndRecordSent = async () => {
-    if (!formattedUpdate) return;
-
-    // Record in local history
     const record: ClientUpdateRecord = {
-      id: Date.now().toString(),
+      id: String(Date.now()),
       projectName: selectedProject?.name,
       clientName,
       originalMessage,
       formattedUpdate,
       liveLink,
-      sentAt: new Date().toLocaleDateString(undefined, {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
+      sentAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
     setClientUpdates([record, ...clientUpdates]);
 
-    // If attached to a project in DB, update last_update_sent timestamp
-    if (selectedProjectId && selectedProjectId !== 'custom') {
+    if (selectedProjectId !== 'custom') {
       try {
         await updateProject(selectedProjectId, {
           last_update_sent: new Date().toISOString(),
         });
-        toast({
-          title: 'Project Status Updated',
-          description: `Recorded update for project: ${selectedProject?.name}`,
-        });
-      } catch (err) {
-        console.error('Failed to update project timestamp:', err);
+        loadProjects();
+      } catch {
+        // ignore
       }
-    } else {
-      toast({
-        title: 'Update Saved',
-        description: 'Saved to recent updates history.',
-      });
     }
+
+    toast({
+      title: 'Update recorded! 🎉',
+      description: 'Logged to project history.',
+    });
   };
 
+  const selectedProject = projects.find((p) => p.id === selectedProjectId);
+
   const getMailToLink = () => {
-    if (!formattedUpdate) return '#';
     const subject = encodeURIComponent(
-      `Project Progress Update: ${selectedProject?.name || clientName}`
+      `Project Progress Update: ${selectedProject ? selectedProject.name : 'Weekly Digest'}`
     );
     const body = encodeURIComponent(formattedUpdate);
     const to = recipientEmail ? encodeURIComponent(recipientEmail) : '';
@@ -194,56 +194,53 @@ export const ClientUpdate = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
+    <div className="space-y-6">
       {/* Header Section */}
       <div>
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-green-500/10 text-green-600 rounded-xl">
-            <Users className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Client Update Hub</h1>
-            <p className="text-sm text-slate-500">
-              Draft polished, milestone-driven communications for clients and link updates directly to your projects.
-            </p>
-          </div>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Client Progress Hub</h1>
+          <Badge variant="outline" className="text-xs font-mono">
+            Milestone Communications
+          </Badge>
         </div>
+        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+          Draft diplomatic, milestone-driven updates for freelance clients and link communications directly to your projects.
+        </p>
       </div>
 
       {/* Main Form & Output Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left: Input Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center justify-between">
+        <Card className="border-border/70 shadow-sm bg-card/80">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center justify-between">
               <span className="flex items-center gap-2">
-                <Briefcase className="w-5 h-5 text-blue-600" />
-                Project & Client Details
+                <Briefcase className="w-4 h-4 text-indigo-500" />
+                <span>Project & Client Details</span>
               </span>
               {selectedProject?.last_update_sent && (
-                <Badge variant="outline" className="text-xs font-normal">
+                <Badge variant="outline" className="text-[10px] font-normal">
                   <Calendar className="w-3 h-3 mr-1" />
-                  Last sent: {new Date(selectedProject.last_update_sent).toLocaleDateString()}
+                  Last: {new Date(selectedProject.last_update_sent).toLocaleDateString()}
                 </Badge>
               )}
             </CardTitle>
-            <CardDescription>
-              Select an existing project or enter client details manually.
+            <CardDescription className="text-xs">
+              Link an active project or enter client details manually
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Project Picker */}
             {projects.length > 0 && (
-              <div>
-                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider block mb-1">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-foreground">
                   Link to Project (Optional)
                 </label>
-                <Select value={selectedProjectId} onValueChange={handleSelectProject}>
-                  <SelectTrigger>
+                <Select value={selectedProjectId} onValueChange={handleProjectSelect}>
+                  <SelectTrigger className="h-9 text-xs">
                     <SelectValue placeholder="Choose a project..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="custom">-- Custom / One-off Client --</SelectItem>
+                    <SelectItem value="custom">— Custom / Unlisted Project —</SelectItem>
                     {projects.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.name} {p.client_name ? `(${p.client_name})` : ''}
@@ -254,87 +251,84 @@ export const ClientUpdate = () => {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider block mb-1">
-                  Client Name *
-                </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-foreground">Client Name *</label>
                 <Input
-                  placeholder="e.g. Acme Corp / Sarah"
+                  placeholder="e.g. Sarah Jenkins"
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
+                  className="h-9 text-xs"
                 />
               </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider block mb-1">
-                  Client Email (Optional)
-                </label>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-foreground">Client Email</label>
                 <Input
-                  type="email"
                   placeholder="client@company.com"
+                  type="email"
                   value={recipientEmail}
                   onChange={(e) => setRecipientEmail(e.target.value)}
+                  className="h-9 text-xs"
                 />
               </div>
             </div>
 
-            <div>
-              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider block mb-1">
-                Live Preview / Staging URL (Optional)
-              </label>
-              <Input
-                placeholder="https://staging.yourproject.com"
-                value={liveLink}
-                onChange={(e) => setLiveLink(e.target.value)}
-              />
-            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-foreground">Your Name / Team</label>
+                <Input
+                  placeholder="e.g. Alex (Engineering)"
+                  value={yourName}
+                  onChange={(e) => setYourName(e.target.value)}
+                  className="h-9 text-xs"
+                />
+              </div>
 
-            {/* Tone Selector */}
-            <div>
-              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider block mb-1">
-                Communication Tone
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={tone === 'friendly' ? 'default' : 'outline'}
-                  onClick={() => setTone('friendly')}
-                  className="text-xs"
-                >
-                  Friendly
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={tone === 'executive' ? 'default' : 'outline'}
-                  onClick={() => setTone('executive')}
-                  className="text-xs"
-                >
-                  Executive
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={tone === 'milestone' ? 'default' : 'outline'}
-                  onClick={() => setTone('milestone')}
-                  className="text-xs"
-                >
-                  Milestone
-                </Button>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-foreground">Live Demo / Staging URL</label>
+                <Input
+                  placeholder="https://staging.app.dev"
+                  value={liveLink}
+                  onChange={(e) => setLiveLink(e.target.value)}
+                  className="h-9 text-xs"
+                />
               </div>
             </div>
 
-            {/* Rough Notes */}
-            <div>
-              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider block mb-1">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-foreground">Communication Tone</label>
+              <div className="flex gap-2">
+                {[
+                  { id: 'professional', label: 'Professional & Polished' },
+                  { id: 'casual', label: 'Friendly & Casual' },
+                  { id: 'executive', label: 'High-Level Exec' },
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setTone(t.id as any)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
+                      tone === t.id
+                        ? 'bg-primary text-primary-foreground border-primary shadow-sm font-semibold'
+                        : 'bg-card text-muted-foreground border-border hover:text-foreground'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-foreground">
                 Progress Notes & Changes *
               </label>
               <Textarea
                 placeholder="e.g. Wrapped up checkout flow, resolved login cookie bug, staging environment updated for QA."
                 value={originalMessage}
                 onChange={(e) => setOriginalMessage(e.target.value)}
-                className="min-h-[110px]"
+                className="min-h-[100px] text-xs"
               />
             </div>
 
@@ -342,16 +336,16 @@ export const ClientUpdate = () => {
               <Button
                 onClick={() => processMessage(false)}
                 disabled={isProcessing || !originalMessage.trim() || !clientName.trim()}
-                className="flex-1 bg-green-600 hover:bg-green-700"
+                className="flex-1 text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-sm"
               >
                 {isProcessing ? (
                   <>
-                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    <RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                     Generating Update...
                   </>
                 ) : (
                   <>
-                    <Users className="w-4 h-4 mr-2" />
+                    <Users className="w-3.5 h-3.5 mr-1.5" />
                     Draft Client Update
                   </>
                 )}
@@ -361,6 +355,9 @@ export const ClientUpdate = () => {
                   variant="outline"
                   onClick={() => processMessage(true)}
                   disabled={isProcessing}
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  title="Generate alternative"
                 >
                   <RefreshCw className="w-4 h-4" />
                 </Button>
@@ -370,12 +367,15 @@ export const ClientUpdate = () => {
         </Card>
 
         {/* Right: Output Card */}
-        <Card className="flex flex-col">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+        <Card className="border-border/70 shadow-sm bg-card/80 flex flex-col justify-between">
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
             <div>
-              <CardTitle className="text-lg">Generated Client Communication</CardTitle>
-              <CardDescription>
-                Tone: <Badge variant="secondary">{tone}</Badge>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-emerald-500" />
+                <span>Generated Client Message</span>
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Tone: <Badge variant="secondary" className="capitalize text-[10px] ml-1">{tone}</Badge>
               </CardDescription>
             </div>
             {formattedUpdate && (
@@ -383,39 +383,40 @@ export const ClientUpdate = () => {
                 size="sm"
                 variant="outline"
                 onClick={() => copyToClipboard(formattedUpdate)}
+                className="h-8 text-xs gap-1"
               >
-                {copied ? <Check className="w-4 h-4 text-green-600 mr-1" /> : <Copy className="w-4 h-4 mr-1" />}
-                {copied ? 'Copied' : 'Copy'}
+                {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copied ? 'Copied' : 'Copy'}</span>
               </Button>
             )}
           </CardHeader>
           <CardContent className="flex-1 flex flex-col justify-between">
             {formattedUpdate ? (
               <div className="space-y-4 flex-1 flex flex-col justify-between">
-                <div className="p-4 bg-slate-50 border rounded-lg text-slate-800 text-sm whitespace-pre-wrap leading-relaxed">
+                <div className="p-4 rounded-xl border border-border/60 bg-muted/30 text-xs leading-relaxed whitespace-pre-wrap font-sans text-foreground flex-1">
                   {formattedUpdate}
                 </div>
 
                 <div className="pt-2 flex flex-col sm:flex-row gap-2">
                   <Button
                     onClick={saveAndRecordSent}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                    className="flex-1 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white"
                   >
-                    <Send className="w-4 h-4 mr-2" />
+                    <Send className="w-3.5 h-3.5 mr-1.5" />
                     Save & Record Sent
                   </Button>
                   <a
                     href={getMailToLink()}
-                    className="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+                    className="inline-flex items-center justify-center rounded-lg text-xs font-semibold border border-border bg-card hover:bg-muted text-foreground h-9 px-4"
                   >
-                    <Mail className="w-4 h-4 mr-2" />
+                    <Mail className="w-3.5 h-3.5 mr-1.5" />
                     Send via Email App
                   </a>
                 </div>
               </div>
             ) : (
-              <div className="flex-1 border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-6 text-slate-400 text-sm text-center">
-                <MessageSquare className="w-8 h-8 mb-2 stroke-1" />
+              <div className="flex-1 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center p-8 text-muted-foreground text-xs text-center min-h-[220px]">
+                <MessageSquare className="w-8 h-8 mb-2 opacity-40" />
                 Select a project, type what you worked on, and generate a client-facing update.
               </div>
             )}
@@ -425,26 +426,27 @@ export const ClientUpdate = () => {
 
       {/* History of Sent Updates */}
       {clientUpdates.length > 0 && (
-        <Card>
-          <CardHeader>
+        <Card className="border-border/70 shadow-sm bg-card/80">
+          <CardHeader className="pb-3">
             <CardTitle className="text-base">Recent Updates Sent This Session</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="divide-y text-sm">
+            <div className="divide-y divide-border/60 text-xs">
               {clientUpdates.map((u) => (
-                <div key={u.id} className="py-3 flex items-center justify-between">
+                <div key={u.id} className="py-2.5 flex items-center justify-between">
                   <div>
-                    <span className="font-medium text-slate-800">
+                    <span className="font-semibold text-foreground">
                       {u.projectName ? `${u.projectName} — ` : ''}{u.clientName}
                     </span>
-                    <span className="text-xs text-slate-400 ml-2">{u.sentAt}</span>
+                    <span className="text-muted-foreground ml-2 text-[11px]">{u.sentAt}</span>
                   </div>
                   <Button
                     size="sm"
                     variant="ghost"
                     onClick={() => copyToClipboard(u.formattedUpdate)}
+                    className="h-7 text-xs"
                   >
-                    <Copy className="w-3.5 h-3.5 mr-1" /> Copy
+                    <Copy className="w-3 h-3 mr-1" /> Copy
                   </Button>
                 </div>
               ))}
